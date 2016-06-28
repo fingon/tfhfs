@@ -9,7 +9,7 @@ This is a layered, user space (for now) distributed filesystem.
 
 * I want either local copy, or transparent remote access to all of my data
   on all of my machines, with almost real-time synchronization (but also
-  support disconnected operation some of the time when I am e.g. in transit).
+  support disconnected operation some of the time when I am in transit).
 
 * Unison ( http://www.cis.upenn.edu/~bcpierce/unison/ ) or SyncThing (
   https://syncthing.net ) could not deal with my # of files / large files
@@ -69,13 +69,13 @@ directory, where e.g. block 1234567890ABCDEF1234567890ABCDEF with reference
 count of 1 is stored within 12/34/56/7890ABCDEF1234567890ABCDEF.1
 file. This scheme scales comfortably to around 10e9 files. (**TBD**: On a
 raw device, you would really want minimal filesystem semantics _here_ to do
-that, but to e.g. cover correct flash rewrite semantics offloading that
+that, but to cover correct flash rewrite semantics offloading that
 logic elsewhere seems like a sane thing to do in any case. I have to think
 about this more.)
 
 Another feature required from the storage layer is ability to atomically
 give a human-readable name to a particular hash-identified data block. This
-can be implemented by e.g. symlink and it is used to keep track of tree
+can be implemented using a symlink and it is used to keep track of tree
 roots in the forest layer.
 
 **NOTE**: It is possible to determine both the name of the block, and the
@@ -103,30 +103,35 @@ of a filesystem. Individual B+ trees are single directories, with:
 	* B+tree of pointers to file data
 
 In addition to the 'content' nested B+ tree noted above, there is probably
-need for others (e.g. to store snapshots, remote synchronization state and
+need for others (to store snapshots, remote synchronization state and
 on-demand remotely accessed blocks' use).
 
 ### Constraints of the design ###
 
-Hard-links (with more than 1 link, e.g. normal files) cannot be
-supported.
+* Hard-links with more than 1 link cannot be supported; 1 link, that is
+normal files, are obviously fine.
+
+* Storage efficiency for small files and directories is suboptimal (B+ tree
+per subdirectory; block per file).
 
 ## Synchronization layer ##
 
-The merging of remote state and local concurrent writes works the same
-way. A nested B+ tree (=filesystem state) is compared recursively, and
-merge done using last-writer-wins semantics.
+The merging of remote state and local concurrent writes works the same way
+(**TBD** think if local concurrent writes are actually sane design). A
+nested B+ tree (=filesystem state) is compared recursively, and merge done
+using last-writer-wins semantics.
 
 Given operations + (add), u (update), - (delete), conflicts are handled as
 follows:
 
 * (+/u, +/u): LWW.
-* (+/u, -): Update timestamp <> directory delete timestamp LWW choice.
+* (+/u, -): LWW based on entry mtime timestamp <> directory delete timestamp.
 * (-, -): Delete.
 
 Writes are atomic as far as finished writes to a file are concerned; given
 two writers, _one of the writers'_ perspective wins and the other one's
-disappears.
+disappears. Also, as long as the file is kept open, the view to a file
+stays consistent.
 
 Typically only a (subset of) content nested B+ tree is synchronized; the
 other (nested) B+ trees are used for local bookkeeping.
