@@ -135,3 +135,35 @@ stays consistent.
 
 Typically only a (subset of) content nested B+ tree is synchronized; the
 other (nested) B+ trees are used for local bookkeeping.
+
+## Notes on 'tinfoil hat' aspects ##
+
+Design:
+
+* Derive encryption key using PBKDF2 and 'large' number of rounds from
+  password.
+
+* Use SHA256 _plaintext_ block data *and* encryption key to acquire block
+  identifiers (With this combination, we can do de-duplication yet without
+  encryption key, even hashes of the plaintext data are not known).
+
+* AES GCM all data in the blocks with per-block IV using the encryption
+  key. Optionally compress/pad them as well. We will opportunistically try
+  to compress everything as well as LZ4 is virtually free, and if size
+  decreases, we use it for stored block.
+
+These are the security characteristics of the current design:
+
+* Without key:
+
+	* Data content is opaque.
+
+	* Data cannot be tampered with, with the exception of history replay
+      attacks; as tree node roots pointers are not encrypted, a more
+      historic root MAY be presented. But obviously blocks can be also
+      deleted and mount made read-only or something, so the I do not
+      consider the attack significant.
+
+	* Size of blocks however IS visible. As an option, stored data blocks
+    are rounded up arbitrarily much. in size (optionally) to prevent
+    fingerprinting by file size (mainly applicable to small files).
