@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 16:29:53 2016 mstenber
-# Last modified: Tue Jun 28 13:38:58 2016 mstenber
-# Edit time:     15 min
+# Last modified: Wed Jun 29 10:44:25 2016 mstenber
+# Edit time:     17 min
 #
 """
 
@@ -52,7 +52,7 @@ class LeafierTreeNode(forest.TreeNode):
 def test_large_tree():
     root = LeafierTreeNode()
     nodes = []
-    for i in range(10000):
+    for i in range(1000):
         name = b'%04d' % i
         n = forest.LeafNode(name)
         n.i = i
