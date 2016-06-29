@@ -2,14 +2,14 @@
 # -*- coding: utf-8 -*-
 # -*- Python -*-
 #
-# $Id: perf.py $
+# $Id: perf_crypto.py $
 #
 # Author: Markus Stenberg <fingon@iki.fi>
 #
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 09:10:49 2016 mstenber
-# Last modified: Wed Jun 29 09:57:45 2016 mstenber
+# Last modified: Wed Jun 29 11:04:28 2016 mstenber
 # Edit time:     35 min
 #
 """Test performance of various things related to confidentiality and
