@@ -9,26 +9,30 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 09:10:49 2016 mstenber
-# Last modified: Wed Jun 29 11:27:28 2016 mstenber
-# Edit time:     39 min
+# Last modified: Wed Jun 29 11:30:59 2016 mstenber
+# Edit time:     43 min
 #
 """Test performance of various things related to confidentiality and
 authentication.
 
 Results from nMP 29.6.2016:
 
-mmh3 10          : 2133247.9326/sec [101ms] (0.4688us/call)
-mmh3 100k        :   63429.9474/sec [98.4ms] (15.765us/call)
-aes 10           :   22198.3661/sec [97.7ms] (45.048us/call)
-aes 100k         :    3784.7220/sec [98.6ms] (264.22us/call)
-aes gcm 10       :   21201.4869/sec [99.7ms] (47.167us/call)
-aes gcm 100k     :    7043.6806/sec [93.8ms] (141.97us/call)
-aes gcm full 10  :   16539.1683/sec [96.3ms] (60.463us/call)
-aes gcm full 100k:    6467.6065/sec [98ms] (154.62us/call)
-sha 256 10       :   48997.3152/sec [98.6ms] (20.409us/call)
-sha 256 100k     :    3369.2205/sec [98.5ms] (296.8us/call)
-fernet 10        :   10607.2052/sec [89.3ms] (94.276us/call)
-fernet 100k      :    1185.1519/sec [97ms] (843.77us/call)
+mmh3 10               : 1978889.2211/sec [100ms] (0.5053us/call)
+mmh3 100k             :   63844.0223/sec [97.9ms] (15.663us/call)
+aes 10                :   27812.2448/sec [97.5ms] (35.955us/call)
+aes 100k              :    4038.9085/sec [97.6ms] (247.59us/call)
+aes gcm 10            :   33470.4986/sec [97.2ms] (29.877us/call)
+aes gcm 100k          :    7855.5295/sec [98.4ms] (127.3us/call)
+aes gcm full 10       :   22897.1457/sec [98.9ms] (43.674us/call)
+aes gcm full 100k     :    7050.3911/sec [98.7ms] (141.84us/call)
+sha 256 10            :   63235.0453/sec [97.4ms] (15.814us/call)
+sha 256 100k          :    3098.3940/sec [98.8ms] (322.75us/call)
+sha 256 (hashlib) 10  :  803653.0822/sec [97ms] (1.2443us/call)
+sha 256 (hashlib) 100k:    3681.0414/sec [98.9ms] (271.66us/call)
+sha 512 10            :   61342.3456/sec [101ms] (16.302us/call)
+sha 512 100k          :    3109.7485/sec [97.8ms] (321.57us/call)
+fernet 10             :   13287.5653/sec [97ms] (75.258us/call)
+fernet 100k           :    1189.3112/sec [95.9ms] (840.82us/call)
 
 => Fernet seems insanely slow, aes gcm is the winner for simple
 conf+auth, and raw sha256 seems to work fine for what we want to do
@@ -59,6 +63,8 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
 from cryptography.hazmat.primitives import padding
 
+import hashlib
+
 text10 = b'1234567890'
 text100k = text10 * 10000
 assert len(text100k) == 100000
@@ -87,6 +93,12 @@ def test_sha256(s):
     d = hashes.Hash(_sha256, backend=_default_backend)
     d.update(s)
     d.finalize()
+
+
+def test_hashlib_sha256(s):
+    h = hashlib.sha256()
+    h.update(s)
+    h.digest()
 
 _sha512 = hashes.SHA256()
 
@@ -134,6 +146,7 @@ for (label, fun) in [('mmh3', test_mmh),
                      ('aes gcm', test_aes_gcm),
                      ('aes gcm full', test_aes_gcm_full),
                      ('sha 256', test_sha256),
+                     ('sha 256 (hashlib)', test_hashlib_sha256),
                      ('sha 512', test_sha512),
                      ('fernet', test_fernet)]:
     def _foo1(fun=fun):
