@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 09:10:49 2016 mstenber
-# Last modified: Wed Jun 29 11:04:28 2016 mstenber
-# Edit time:     35 min
+# Last modified: Wed Jun 29 11:27:28 2016 mstenber
+# Edit time:     39 min
 #
 """Test performance of various things related to confidentiality and
 authentication.
@@ -88,6 +88,13 @@ def test_sha256(s):
     d.update(s)
     d.finalize()
 
+_sha512 = hashes.SHA256()
+
+
+def test_sha512(s):
+    d = hashes.Hash(_sha256, backend=_default_backend)
+    d.update(s)
+    d.finalize()
 
 iv = os.urandom(16)
 cipher = Cipher(algorithms.AES(rawkey), modes.CBC(iv),
@@ -127,6 +134,7 @@ for (label, fun) in [('mmh3', test_mmh),
                      ('aes gcm', test_aes_gcm),
                      ('aes gcm full', test_aes_gcm_full),
                      ('sha 256', test_sha256),
+                     ('sha 512', test_sha512),
                      ('fernet', test_fernet)]:
     def _foo1(fun=fun):
         fun(text10)
