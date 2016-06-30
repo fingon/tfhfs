@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Thu Jun 30 16:54:28 2016 mstenber
-# Edit time:     27 min
+# Last modified: Fri Jul  1 00:45:43 2016 mstenber
+# Edit time:     54 min
 #
 """This is the 'forest layer' main module.
 
@@ -24,29 +24,71 @@ purged as desired.
 """
 
 import hashlib
+from enum import Enum
+
+import cbor
 
 import btree
-from endecode import Decoder, Encoder
 
-TYPE_DIR_NODE = 1
-TYPE_FILE_TREE_NODE = 2
-TYPE_FILE_DATA = 3
+
+class NodeType(Enum):
+    dirnode = 1  # children are also DirectoryTreeNodes
+    leafydirnode = 2  # children are DirectoryEntries
+
+    filenode = 3  # children are also FileTreeNodes
+    leafyfilenode = 4  # children are FileData
+
+    filedata = 5  # node itself is FileData
 
 
 class DirectoryEntry(btree.LeafNode):
-    pass
+
+    @classmethod
+    def from_forest_block_child_data(cls, forest, d):
+        pass
 
 
 class DirectoryTreeNode(btree.TreeNode):
 
+    def __init__(self, forest):
+        self.forest = forest
+        btree.TreeNode.__init__(self)
+
     @classmethod
-    def from_data(cls, d):
-        tn = cls()
+    def from_forest_block_data(cls, forest, d):
+        tn = cls(forest)
+        (t, d) = d
+        assert t in [Enum.dirnode.value, Enum.leafyfilenode.value]
+        (tn.child_keys, child_data_list) = cbor.loads(d)
+        for cd in child_data_list:
+            if t == Enum.dirnode.value:
+                tn2 = cls.from_forest_block_child_data(forest, cd)
+            if t == Enum.leafydirnode.value:
+                tn2 = DirectoryEntry.from_forest_block_child_data(forest, cd)
+            tn._add_child(tn2)
+
+        return tn
+
+    @classmethod
+    def from_forest_block_child_data(cls, forest, d):
+        pass
+
+    def to_block_data(self):
+        # n/a: 'key' (should be known already)
+        l = [self.child_keys,
+             [x.to_block_data_child() for x in self.children]]
+        t = self.is_leafy and NodeType.leafydirnode or NodeType.dirnode
+        return (t.value, cbor.dumps(l))
+
+    def to_block_data_child(self):
+        return self.data
 
 
 def _sha256(*l):
     h = hashlib.sha256()
     for s in l:
+        if isinstance(s, int):
+            s = bytes([s])
         h.update(s)
     h.digest()
 
@@ -71,5 +113,4 @@ class Forest:
             return tn
         # block _did_ exist.
         (t, d) = data
-        assert t == TYPE_DIR_NODE
-        return DirectoryTreeNode.from_data(data)
+        return DirectoryTreeNode.from_forest_data(self, d)
