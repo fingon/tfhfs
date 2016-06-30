@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 16:53:21 2016 mstenber
-# Last modified: Thu Jun 30 17:13:27 2016 mstenber
-# Edit time:     17 min
+# Last modified: Thu Jun 30 17:16:57 2016 mstenber
+# Edit time:     19 min
 #
 """Encoder/Decoder for binary data.
 
@@ -98,10 +98,10 @@ class Encoder:
         return self
 
     def encode_uint32(self, v):
-        self.encode_bytes(v >> 24)
-        self.encode_bytes(v >> 16 & 0xff)
-        self.encode_bytes(v >> 8 & 0xff)
-        self.encode_bytes(v & 0xff)
+        self.encode_uint8(v >> 24)
+        self.encode_uint8(v >> 16 & 0xff)
+        self.encode_uint8(v >> 8 & 0xff)
+        self.encode_uint8(v & 0xff)
         return self
 
     def encode_uint64(self, v):
@@ -129,4 +129,3 @@ class Encoder:
 
     def get_result(self):
         return b''.join(self.l)
-        return self
