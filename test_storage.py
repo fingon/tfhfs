@@ -9,16 +9,18 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Thu Jun 30 13:25:42 2016 mstenber
-# Edit time:     18 min
+# Last modified: Thu Jun 30 15:28:29 2016 mstenber
+# Edit time:     32 min
 #
 """
 
 """
 
-from storage import SQLiteStorage, DelayedStorage
+from storage import SQLiteStorage, DelayedStorage, ConfidentialBlockCodec, TypedBlockCodec, NopBlockCodec, CompressingTypedBlockCodec
 import pytest
 import sqlite3
+import cryptography.exceptions
+import unittest
 
 
 def _nop():
@@ -71,6 +73,52 @@ def _prod_storage(s, flush=_nop):
     assert s.get_block_by_id(b'id2')[1] == 1
     s.release_block(b'id2')
     flush()
+
+
+class ConfidentialBlockCodecTests(unittest.TestCase):
+
+    def setUp(self):
+        self.password = b'assword'
+        self.plaintext = b'foo'
+        self.block_id = b'12345678901234567890123456789012'
+        self.cbc = ConfidentialBlockCodec(self.password)
+        self.ciphertext = self.cbc.encode_block(self.block_id, self.plaintext)
+
+    def test_confidentialblockcodec(self):
+        plaintext = self.cbc.decode_block(self.block_id, self.ciphertext)
+        assert plaintext == self.plaintext
+
+    @pytest.mark.xfail(raises=cryptography.exceptions.InvalidTag)
+    def test_confidentialblockcodec_decode_error_1(self):
+        s = self.ciphertext + b'42'  # 'flawed' input -> cannot pass check
+        self.cbc.decode_block(self.block_id, s)
+
+    @pytest.mark.xfail(raises=AssertionError)
+    def test_confidentialblockcodec_decode_error_2(self):
+        self.cbc.decode_block(self.block_id, b'x')
+
+
+def test_typeencoding():
+    t = TypedBlockCodec(NopBlockCodec())
+    s = t.encode_block(None, (7, b'42'))
+    assert s == bytes([7]) + b'42'
+    assert t.decode_block(None, s) == (7, b'42')
+
+
+def test_compression():
+    c = CompressingTypedBlockCodec(NopBlockCodec())
+    plaintext = b'1234567890' * 50
+    s = c.encode_block(None, (7, plaintext))
+    assert len(s) < len(plaintext)  # woah, miracle of compression happened!
+    assert c.decode_block(None, s) == (7, plaintext)
+
+
+def test_compression_fail():
+    c = CompressingTypedBlockCodec(NopBlockCodec())
+    plaintext = b'1'
+    s = c.encode_block(None, (7, plaintext))
+    assert len(s) == (1 + len(plaintext))  # no compression :p
+    assert c.decode_block(None, s) == (7, plaintext)
 
 
 def test_sqlitestorage():

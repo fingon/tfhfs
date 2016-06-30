@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Thu Jun 30 13:29:48 2016 mstenber
-# Edit time:     98 min
+# Last modified: Thu Jun 30 15:27:49 2016 mstenber
+# Edit time:     142 min
 #
 """
 
@@ -24,8 +24,135 @@ uses storage backend for actual raw file operations.
 import sqlite3
 import time
 import logging
+import os
+
+import lz4
+
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 _debug = logging.getLogger(__name__).debug
+
+
+class BlockCodec:
+    """This is a class which handles the raw encode-decode of block
+data. This is not yet type-specific, but may e.g. do
+compression+encryption."""
+
+    def encode_block(self, block_id, block_data):
+        raise NotImplementedError
+
+    def decode_block(self, block_id, block_data):
+        raise NotImplementedError
+
+
+class NopBlockCodec(BlockCodec):
+
+    def encode_block(self, block_id, block_data):
+        return block_data
+
+    def decode_block(self, block_id, block_data):
+        return block_data
+
+
+class ConfidentialBlockCodec(BlockCodec):
+    """Real class which implements the (outer layer) of block codec
+stuff, which provides for confidentiality and authentication of the
+data within.."""
+    magic = b'4207'
+    block_id_len = 32
+    iv_len = 16
+    tag_len = 16
+
+    def __init__(self, password):
+        self.backend = default_backend()
+        # TBD: is empty salt ever ok? :p
+        salt = b''
+        kdf = PBKDF2HMAC(algorithm=hashes.SHA256(),
+                         length=32,
+                         salt=salt,
+                         iterations=100000,
+                         backend=self.backend)
+        self.key = kdf.derive(password)
+
+    def encode_block(self, block_id, block_data):
+        assert (isinstance(block_id, bytes)
+                and len(block_id) == self.block_id_len)
+        iv = os.urandom(self.iv_len)
+        c = Cipher(algorithms.AES(self.key), modes.GCM(iv),
+                   backend=self.backend)
+        e = c.encryptor()
+        s = e.update(block_id) + e.update(block_data) + e.finalize()
+        l = [self.magic, iv, e.tag, s]
+        assert len(e.tag) == self.tag_len
+        return b''.join(l)
+
+    def decode_block(self, block_id, block_data):
+        assert (isinstance(block_id, bytes)
+                and len(block_id) == self.block_id_len)
+        assert isinstance(block_data, bytes)
+        assert len(block_data) > (len(self.magic) + self.iv_len + self.tag_len)
+
+        # check magic
+        ofs = len(self.magic)
+        assert block_data[:ofs] == self.magic
+
+        # get iv
+        iv = block_data[ofs:ofs + self.iv_len]
+        ofs += self.iv_len
+
+        # get tag
+        tag = block_data[ofs:ofs + self.tag_len]
+        ofs += self.tag_len
+
+        c = Cipher(algorithms.AES(self.key), modes.GCM(iv, tag),
+                   backend=self.backend)
+        d = c.decryptor()
+        s = d.update(block_data[ofs:]) + d.finalize()
+        assert s[:self.block_id_len] == block_id
+        return s[self.block_id_len:]
+
+
+class TypedBlockCodec(BlockCodec):
+
+    def __init__(self, codec):
+        self.codec = codec
+
+    def encode_block(self, block_id, block_data):
+        (t, d) = block_data
+        assert isinstance(t, int) and t >= 0 and t < 256  # just one byte
+        assert isinstance(d, bytes)
+        return self.codec.encode_block(block_id, bytes([t]) + d)
+
+    def decode_block(self, block_id, block_data):
+        assert isinstance(block_data, bytes)
+        assert len(block_data) > 0
+        rd = self.codec.decode_block(block_id, block_data)
+        assert len(rd) > 0
+        return (rd[0], rd[1:])
+
+
+class CompressingTypedBlockCodec(TypedBlockCodec):
+
+    bit_compressed = 0x80
+
+    def encode_block(self, block_id, block_data):
+        (t, d) = block_data
+        assert not (t & self.bit_compressed)
+        cd = lz4.compress(d)
+        if len(cd) < len(d):
+            t = t | self.bit_compressed
+            d = cd
+        return TypedBlockCodec.encode_block(self, block_id, (t, d))
+
+    def decode_block(self, block_id, block_data):
+        (t, d) = TypedBlockCodec.decode_block(self, block_id, block_data)
+        if t & self.bit_compressed:
+            d = lz4.loads(d)
+            t = t & ~self.bit_compressed
+        return (t, d)
 
 
 class Storage:
@@ -217,13 +344,13 @@ class DelayedStorage(Storage):
         ops = 0
         for block_id, o in self._blocks.items():
             (block_data, block_refcnt), orig_refcnt, _, _ = o
-            if not orig_refcnt and block_refcnt:
-                self.storage.store_block(
-                    block_id, block_data, refcnt=block_refcnt)
-            elif block_refcnt != orig_refcnt:
-                self.storage.set_block_refcnt(block_id, block_refcnt)
-            else:
+            if block_refcnt == orig_refcnt:
                 continue
+            if not orig_refcnt and block_refcnt:
+                self.storage.store_block(block_id, block_data,
+                                         refcnt=block_refcnt)
+            else:
+                self.storage.set_block_refcnt(block_id, block_refcnt)
             ops += 1
             o[1] = block_refcnt
         for block_name, o in self._names.items():
