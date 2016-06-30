@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Thu Jun 30 12:59:07 2016 mstenber
-# Edit time:     16 min
+# Last modified: Thu Jun 30 13:25:42 2016 mstenber
+# Edit time:     18 min
 #
 """
 
@@ -32,7 +32,7 @@ def _prod_storage(s, flush=_nop):
     assert s.get_block_data_by_id(b'foo') == b'bar'
 
     # refcnt = 2
-    s.store_block(b'foo')
+    s.refer_block(b'foo')
     flush()
     assert s.get_block_data_by_id(b'foo') == b'bar'
 
@@ -47,11 +47,11 @@ def _prod_storage(s, flush=_nop):
     assert s.get_block_data_by_id(b'foo') == None
 
     assert s.get_block_id_by_name(b'foo') == None
-    s.set_block_id_name(b'bar', b'foo')
+    s.set_block_name(b'bar', b'foo')
     flush()
     assert s.get_block_id_by_name(b'foo') == b'bar'
 
-    s.set_block_id_name(None, b'foo')
+    s.set_block_name(None, b'foo')
     flush()
     assert s.get_block_id_by_name(b'foo') == None
 

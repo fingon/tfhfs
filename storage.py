@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Thu Jun 30 12:54:59 2016 mstenber
-# Edit time:     81 min
+# Last modified: Thu Jun 30 13:29:48 2016 mstenber
+# Edit time:     98 min
 #
 """
 
@@ -55,7 +55,7 @@ set, None is returned."""
 
     def on_add_block_data(self, block_data):
         for block_id in self.get_block_data_references(block_data):
-            self.store_block(block_id)
+            self.refer_block(block_id)
 
     def on_delete_block_id(self, block_id):
         r = self.get_block_by_id(block_id)
@@ -64,22 +64,35 @@ set, None is returned."""
         for block_id2 in self.get_block_data_references(block_data):
             self.release_block(block_id2)
 
-    def release_block(self, block_id):
-        """Release reference to a block. True is returned if the block still
-exists after release (=has references)."""
-        raise NotImplementedError
+    def refer_block(self, block_id):
+        r = self.get_block_by_id(block_id)
+        assert r
+        self.set_block_refcnt(block_id, r[1] + 1)
 
-    def set_block_id_name(self, block_id, n):
+    def release_block(self, block_id):
+        r = self.get_block_by_id(block_id)
+        assert r and r[1] > 0
+        refcnt = r[1] - 1
+        self.set_block_refcnt(block_id, refcnt)
+        return refcnt > 0
+
+    def set_block_name(self, block_id, n):
         """ Set name of the block 'block_id' to 'n'.
 
         This does not change reference counts. """
         raise NotImplementedError
 
-    def store_block(self, block_id, block_data=None):
-        """ Store a block with the given block identifier.
+    def set_block_refcnt(self, block_id, refcnt):
+        """ Set reference count of the 'block_id' to 'refcnt'.
 
-        If it already exists, increment reference count by 1.
+        If refcnt is zero, the block should be removed.
         """
+        raise NotImplementedError
+
+    def store_block(self, block_id, block_data, *, refcnt=1):
+        """Store a block with the given block identifier. Note that it is an
+error to call this for already existing block; refer_block or
+set_block_refcnt should be called instead in that case."""
         raise NotImplementedError
 
 
@@ -136,39 +149,34 @@ mix the two hobby projects for now..
         assert len(r) == 1
         return r[0][0]
 
-    def release_block(self, block_id):
-        _debug('release_block %s', block_id)
-
-        # TBD: this is not threadsafe, but what sort of sane person
-        # would multithread this backend anyway?
-        self._get_execute_result(
-            'UPDATE blocks SET refcnt=refcnt-1 WHERE id=?', (block_id,))
-        r = self._get_execute_result(
-            'SELECT refcnt FROM blocks WHERE id=?', (block_id,))
-        assert r
-        if r[0][0]:
-            return True
-        self.on_delete_block_id(block_id)
-        self._get_execute_result(
-            'DELETE FROM blocks WHERE id=? and refcnt=0', (block_id,))
-
-    def set_block_id_name(self, block_id, n):
-        _debug('set_block_id_name %s %s', block_id, n)
+    def set_block_name(self, block_id, n):
+        _debug('set_block_name %s %s', block_id, n)
         self._get_execute_result(
             'DELETE FROM blocknames WHERE name=?', (n,))
         self._get_execute_result(
             'INSERT INTO blocknames VALUES (?, ?)', (n, block_id))
 
-    def store_block(self, block_id, block_data=None):
+    def set_block_refcnt(self, block_id, refcnt):
+        _debug('release_block %s', block_id)
+
+        # TBD: this is not threadsafe, but what sort of sane person
+        # would multithread this backend anyway?
+        self._get_execute_result(
+            'UPDATE blocks SET refcnt=? WHERE id=?', (refcnt, block_id,))
+        if refcnt:
+            return
+        self.on_delete_block_id(block_id)
+        self._get_execute_result(
+            'DELETE FROM blocks WHERE id=? and refcnt=0', (block_id,))
+
+    def store_block(self, block_id, block_data, *, refcnt=1):
         _debug('store_block %s %s', block_id, block_data)
-        if self.get_block_by_id(block_id) is not None:
-            self._get_execute_result(
-                'UPDATE blocks SET refcnt=refcnt+1 WHERE id=?', (block_id,))
-        else:
-            assert block_data is not None
-            self.on_add_block_data(block_data)
-            self._get_execute_result(
-                'INSERT INTO blocks VALUES (?, ?, 1)', (block_id, block_data))
+        assert self.get_block_data_by_id(block_id) is None
+        assert block_data is not None
+        self.on_add_block_data(block_data)
+        self._get_execute_result(
+            'INSERT INTO blocks VALUES (?, ?, ?)', (block_id, block_data,
+                                                    refcnt))
 
 
 class DelayedStorage(Storage):
@@ -210,22 +218,18 @@ class DelayedStorage(Storage):
         for block_id, o in self._blocks.items():
             (block_data, block_refcnt), orig_refcnt, _, _ = o
             if not orig_refcnt and block_refcnt:
-                self.storage.store_block(block_id, block_data)
-                orig_refcnt += 1
-                ops += 1
-            while block_refcnt < orig_refcnt:
-                self.storage.release_block(block_id)
-                orig_refcnt -= 1
-                ops += 1
-            while block_refcnt > orig_refcnt:
-                self.storage.store_block(block_id)
-                orig_refcnt += 1
-                ops += 1
+                self.storage.store_block(
+                    block_id, block_data, refcnt=block_refcnt)
+            elif block_refcnt != orig_refcnt:
+                self.storage.set_block_refcnt(block_id, block_refcnt)
+            else:
+                continue
+            ops += 1
             o[1] = block_refcnt
         for block_name, o in self._names.items():
             (current_id, orig_id) = o
             if current_id != orig_id:
-                self.storage.set_block_id_name(current_id, block_name)
+                self.storage.set_block_name(current_id, block_name)
                 o[1] = o[0]
                 ops += 1
         self.cache_size += self.dirty_size
@@ -258,31 +262,29 @@ class DelayedStorage(Storage):
     def get_block_id_by_name(self, n):
         return self._get_block_id_by_name(n)[0]
 
-    def release_block(self, block_id):
+    def set_block_name(self, block_id, n):
+        self._get_block_id_by_name(n)[0] = block_id
+
+    def set_block_refcnt(self, block_id, refcnt):
         r = self._get_block_by_id(block_id)
-        if r[0][1] > 1:
-            r[0][1] -= 1
-            return True
+        if refcnt:
+            r[0][1] = refcnt
+            return
         self.on_delete_block_id(block_id)
-        r[0][1] -= 1
+        r[0][1] = 0
         if not r[1]:
             self.dirty_size -= len(r[0][0])
         else:
             self.cache_size -= len(r[0][0])
         r[0][0] = None
 
-    def set_block_id_name(self, block_id, n):
-        self._get_block_id_by_name(n)[0] = block_id
-
-    def store_block(self, block_id, block_data=None):
+    def store_block(self, block_id, block_data, *, refcnt=1):
         r = self._get_block_by_id(block_id)
-        if r[0][0] is None:
-            assert block_data
-            self.on_add_block_data(block_data)
-            r[0][0] = block_data
-            r[0][1] += 1
-            self.dirty_size += len(block_data)
-            if self.maximum_dirty_size and self.dirty_size > self.maximum_dirty_size:
-                self.flush()
-        else:
-            r[0][1] += 1
+        assert r[0][0] is None
+        assert block_data
+        self.on_add_block_data(block_data)
+        r[0][0] = block_data
+        r[0][1] = refcnt
+        self.dirty_size += len(block_data)
+        if self.maximum_dirty_size and self.dirty_size > self.maximum_dirty_size:
+            self.flush()

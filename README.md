@@ -92,6 +92,7 @@ of a filesystem. Individual B+ trees are single directories, with:
 
 * header:
 	* last modified, last create, last delete timestamp (UTC)
+	* (recursively calculated) size, # of blocks, # of files
 
 * key = 32-bit MurmurHash3 of filename concatenated with the actual
   filename, and
