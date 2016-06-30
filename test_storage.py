@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Thu Jun 30 15:42:33 2016 mstenber
-# Edit time:     36 min
+# Last modified: Thu Jun 30 17:30:12 2016 mstenber
+# Edit time:     38 min
 #
 """
 
@@ -91,6 +91,10 @@ class ConfidentialBlockCodecTests(unittest.TestCase):
     def test_confidentialblockcodec(self):
         plaintext = self.cbc.decode_block(self.block_id, self.ciphertext)
         assert plaintext == self.plaintext
+
+    @pytest.mark.xfail(raises=cryptography.exceptions.InvalidTag)
+    def test_confidentialblockcodec_decode_error_1(self):
+        self.cbc.decode_block(self.block_id + b'42', self.ciphertext)
 
     @pytest.mark.xfail(raises=cryptography.exceptions.InvalidTag)
     def test_confidentialblockcodec_decode_error_1(self):
