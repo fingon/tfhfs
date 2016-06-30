@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Thu Jun 30 16:54:21 2016 mstenber
-# Edit time:     157 min
+# Last modified: Thu Jun 30 17:28:28 2016 mstenber
+# Edit time:     158 min
 #
 """
 
@@ -88,7 +88,8 @@ data within.."""
         c = Cipher(algorithms.AES(self.key), modes.GCM(iv),
                    backend=self.backend)
         e = c.encryptor()
-        s = e.update(block_id) + e.update(block_data) + e.finalize()
+        e.authenticate_additional_data(block_id)
+        s = e.update(block_data) + e.finalize()
         assert len(e.tag) == self.tag_len
         enc.encode_bytes(e.tag)
         enc.encode_bytes(s)
@@ -114,11 +115,10 @@ data within.."""
         c = Cipher(algorithms.AES(self.key), modes.GCM(iv, tag),
                    backend=self.backend)
         d = c.decryptor()
-        s = d.update(dec.decode_bytes_rest()) + d.finalize()
+        d.authenticate_additional_data(block_id)
 
-        dec2 = Decoder(s)
-        assert dec2.decode_bytes(self.block_id_len) == block_id
-        return dec2.decode_bytes_rest()
+        s = d.update(dec.decode_bytes_rest()) + d.finalize()
+        return s
 
 
 class TypedBlockCodec(BlockCodec):
