@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 16:29:53 2016 mstenber
-# Last modified: Wed Jun 29 10:44:25 2016 mstenber
-# Edit time:     17 min
+# Last modified: Thu Jun 30 12:53:54 2016 mstenber
+# Edit time:     22 min
 #
 """
 
@@ -18,6 +18,7 @@
 
 import forest
 import random
+import pytest
 
 
 def test_simple():
@@ -71,6 +72,10 @@ def test_large_tree():
         assert root.search(n2) is n
 
     assert root.depth > 1
+
+    assert root.root == root
+    assert root.children[0].root == root
+
     # Randomly remove nodes from it; the tree should stay fully functional to
     # the bitter end.
     random.shuffle(nodes)
@@ -80,3 +85,12 @@ def test_large_tree():
         assert root.search(n2) is n
         root.remove(n)
     assert root.depth == 1
+
+
+@pytest.mark.xfail(raises=TypeError)
+def test_eq_1():
+    forest.LeafNode(b'x') < 1
+
+
+def test_eq_2():
+    forest.LeafNode(b'x') == 1
