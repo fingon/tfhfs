@@ -9,20 +9,20 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 15:36:58 2016 mstenber
-# Last modified: Tue Jun 28 13:38:30 2016 mstenber
-# Edit time:     186 min
+# Last modified: Thu Jun 30 14:24:59 2016 mstenber
+# Edit time:     196 min
 #
-"""
+"""This is the 'btree' module.
 
-This is the 'forest layer' main module.
-
-It implements nested tree concept, with an interface to the storage layer.
+It implements abstract COW-friendly B+ trees.
 
 """
 
 import bisect
 import functools
 import logging
+import mmh3
+from ms.lazy import lazy_property
 
 _debug = logging.getLogger(__name__).debug
 
@@ -34,7 +34,7 @@ NAME_SIZE = 256  # maximum length of single name
 @functools.total_ordering
 class Node:
 
-    header_size = 0
+    header_size = NAME_HASH_SIZE + HASH_SIZE
 
     parent = None
 
@@ -52,20 +52,17 @@ class Node:
     def __eq__(self, other):
         if not isinstance(other, Node):
             return NotImplemented
-        return self.name == other.name
+        return self.key == other.key
 
     def __lt__(self, other):
         if not isinstance(other, Node):
             return NotImplemented
-        return self.name < other.name
-
-    @property
-    def size(self):
-        return (self.header_size + len(self.name) + HASH_SIZE +
-                NAME_HASH_SIZE)
+        return self.key < other.key
 
 
 class LeafNode(Node):
+
+    name_hash_size = NAME_HASH_SIZE
 
     def __init__(self, name, **kw):
         assert isinstance(name, bytes)
@@ -74,6 +71,17 @@ class LeafNode(Node):
 
     def __repr__(self):
         return '<%s %s>' % (self.__class__.__name__, self.name)
+
+    @lazy_property
+    def key(self):
+        b = mmh3.hash_bytes(self.name)
+        if len(b) > self.name_hash_size:
+            b = b[:self.name_hash_size]
+        return b + self.name
+
+    @lazy_property
+    def size(self):
+        return self.header_size + len(self.name)
 
 
 class TreeNode(Node):
@@ -84,6 +92,8 @@ node. """
     minimum_size = maximum_size * 1 / 4
     has_spares_size = maximum_size / 2
 
+    key = None
+
     # Note: minimum_size + has_spares_size MUST be less than maximum_size
 
     def __init__(self, **kw):
@@ -93,8 +103,13 @@ node. """
 
     def __repr__(self):
         return '<%s >=%s - depth %d>' % (self.__class__.__name__,
-                                         self.name,
-                                         self.depth)
+                                         self.key, self.depth)
+
+    def _set_key(self):
+        if self.children:
+            self.key = self.children[0].key
+        else:
+            self.key = None
 
     def _add_child(self, c):
         assert isinstance(c, Node)
@@ -103,6 +118,7 @@ node. """
         bisect.insort(self.children, c)
         #_debug(' children post:%s', self.children)
         c.parent = self
+        self._set_key()
 
     def _pop_child(self, idx):
         c = self.children[idx]
@@ -113,6 +129,7 @@ node. """
         assert isinstance(c, Node)
         self.csize -= c.size
         self.children.remove(c)
+        self._set_key()
 
     def add_child(self, c):
         _debug('add_child %s', c)
@@ -205,13 +222,9 @@ node. """
 
         self.parent.remove_child(self)
 
-    @property
-    def name(self):
-        return self.children and self.children[0].name
-
-    @property
+    @lazy_property
     def size(self):
-        return (self.header_size + NAME_SIZE + HASH_SIZE + NAME_HASH_SIZE)
+        return self.header_size + NAME_SIZE
 
     def remove(self, c):
         sc = self.search(c)
