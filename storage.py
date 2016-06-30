@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Thu Jun 30 15:27:49 2016 mstenber
-# Edit time:     142 min
+# Last modified: Thu Jun 30 16:54:21 2016 mstenber
+# Edit time:     157 min
 #
 """
 
@@ -21,17 +21,18 @@ uses storage backend for actual raw file operations.
 
 """
 
-import sqlite3
-import time
 import logging
 import os
+import sqlite3
+import time
+
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 import lz4
-
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from endecode import Decoder, Encoder
 
 _debug = logging.getLogger(__name__).debug
 
@@ -80,14 +81,18 @@ data within.."""
     def encode_block(self, block_id, block_data):
         assert (isinstance(block_id, bytes)
                 and len(block_id) == self.block_id_len)
+        enc = Encoder()
+        enc.encode_bytes(self.magic)
         iv = os.urandom(self.iv_len)
+        enc.encode_bytes(iv)
         c = Cipher(algorithms.AES(self.key), modes.GCM(iv),
                    backend=self.backend)
         e = c.encryptor()
         s = e.update(block_id) + e.update(block_data) + e.finalize()
-        l = [self.magic, iv, e.tag, s]
         assert len(e.tag) == self.tag_len
-        return b''.join(l)
+        enc.encode_bytes(e.tag)
+        enc.encode_bytes(s)
+        return enc.get_result()
 
     def decode_block(self, block_id, block_data):
         assert (isinstance(block_id, bytes)
@@ -95,24 +100,25 @@ data within.."""
         assert isinstance(block_data, bytes)
         assert len(block_data) > (len(self.magic) + self.iv_len + self.tag_len)
 
+        dec = Decoder(block_data)
+
         # check magic
-        ofs = len(self.magic)
-        assert block_data[:ofs] == self.magic
+        assert dec.decode_bytes(len(self.magic)) == self.magic
 
         # get iv
-        iv = block_data[ofs:ofs + self.iv_len]
-        ofs += self.iv_len
+        iv = dec.decode_bytes(self.iv_len)
 
         # get tag
-        tag = block_data[ofs:ofs + self.tag_len]
-        ofs += self.tag_len
+        tag = dec.decode_bytes(self.tag_len)
 
         c = Cipher(algorithms.AES(self.key), modes.GCM(iv, tag),
                    backend=self.backend)
         d = c.decryptor()
-        s = d.update(block_data[ofs:]) + d.finalize()
-        assert s[:self.block_id_len] == block_id
-        return s[self.block_id_len:]
+        s = d.update(dec.decode_bytes_rest()) + d.finalize()
+
+        dec2 = Decoder(s)
+        assert dec2.decode_bytes(self.block_id_len) == block_id
+        return dec2.decode_bytes_rest()
 
 
 class TypedBlockCodec(BlockCodec):
@@ -233,8 +239,9 @@ mix the two hobby projects for now..
 
     """
 
-    def __init__(self, name=':memory:', **kw):
-        self.conn = sqlite3.connect(name)
+    def __init__(self, *, codec=None, filename=':memory:', **kw):
+        self.codec = codec or NopBlockCodec()
+        self.conn = sqlite3.connect(filename)
         self._get_execute_result(
             'CREATE TABLE blocks(id PRIMARY KEY, data, refcnt);')
         self._get_execute_result(
@@ -265,7 +272,7 @@ mix the two hobby projects for now..
         if len(r) == 0:
             return
         assert len(r) == 1
-        return r[0]
+        return [self.codec.decode_block(block_id, r[0][0]), r[0][1]]
 
     def get_block_id_by_name(self, n):
         _debug('get_block_id_by_name %s', n)
@@ -301,8 +308,9 @@ mix the two hobby projects for now..
         assert self.get_block_data_by_id(block_id) is None
         assert block_data is not None
         self.on_add_block_data(block_data)
+        e_block_data = self.codec.encode_block(block_id, block_data)
         self._get_execute_result(
-            'INSERT INTO blocks VALUES (?, ?, ?)', (block_id, block_data,
+            'INSERT INTO blocks VALUES (?, ?, ?)', (block_id, e_block_data,
                                                     refcnt))
 
 

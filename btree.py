@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 15:36:58 2016 mstenber
-# Last modified: Thu Jun 30 14:24:59 2016 mstenber
-# Edit time:     196 min
+# Last modified: Thu Jun 30 16:14:50 2016 mstenber
+# Edit time:     202 min
 #
 """This is the 'btree' module.
 
@@ -21,6 +21,7 @@ It implements abstract COW-friendly B+ trees.
 import bisect
 import functools
 import logging
+
 import mmh3
 from ms.lazy import lazy_property
 
@@ -105,12 +106,6 @@ node. """
         return '<%s >=%s - depth %d>' % (self.__class__.__name__,
                                          self.key, self.depth)
 
-    def _set_key(self):
-        if self.children:
-            self.key = self.children[0].key
-        else:
-            self.key = None
-
     def _add_child(self, c):
         assert isinstance(c, Node)
         self.csize += c.size
@@ -118,7 +113,8 @@ node. """
         bisect.insort(self.children, c)
         #_debug(' children post:%s', self.children)
         c.parent = self
-        self._set_key()
+        if self.children[0] == c:
+            self.key = self.children[0].key
 
     def _pop_child(self, idx):
         c = self.children[idx]
@@ -128,8 +124,10 @@ node. """
     def _remove_child(self, c):
         assert isinstance(c, Node)
         self.csize -= c.size
-        self.children.remove(c)
-        self._set_key()
+        idx = self.children.index(c)
+        del self.children[idx]
+        if not idx and self.children:
+            self.key = self.children[0].key
 
     def add_child(self, c):
         _debug('add_child %s', c)
@@ -265,12 +263,3 @@ node. """
         sc = self.search_prev_or_eq(c)
         if sc == c:
             return sc
-
-    @classmethod
-    def from_block(self, data):
-        # TBD: use pycapnp to do stuff - http://jparyani.github.io/pycapnp/
-        raise NotImplementedError
-
-    def to_block(self):
-        # TBD: use pycapnp to do stuff - http://jparyani.github.io/pycapnp/
-        raise NotImplementedError

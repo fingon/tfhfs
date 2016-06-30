@@ -9,18 +9,22 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Thu Jun 30 15:28:29 2016 mstenber
-# Edit time:     32 min
+# Last modified: Thu Jun 30 15:42:33 2016 mstenber
+# Edit time:     36 min
 #
 """
 
 """
 
-from storage import SQLiteStorage, DelayedStorage, ConfidentialBlockCodec, TypedBlockCodec, NopBlockCodec, CompressingTypedBlockCodec
-import pytest
 import sqlite3
-import cryptography.exceptions
 import unittest
+
+import cryptography.exceptions
+import pytest
+
+from storage import (BlockCodec, CompressingTypedBlockCodec,
+                     ConfidentialBlockCodec, DelayedStorage, NopBlockCodec,
+                     SQLiteStorage, TypedBlockCodec)
 
 
 def _nop():
