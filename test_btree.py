@@ -9,16 +9,19 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 16:29:53 2016 mstenber
-# Last modified: Thu Jun 30 14:24:27 2016 mstenber
-# Edit time:     28 min
+# Last modified: Thu Jun 30 23:51:35 2016 mstenber
+# Edit time:     32 min
 #
 """
 
 """
 
-import btree
+import logging
 import random
-import pytest
+
+import btree
+
+_debug = logging.getLogger(__name__).debug
 
 
 class NoHashLeafNode(btree.LeafNode):
@@ -69,7 +72,8 @@ def test_large_tree():
         n.i = i
         nodes.append(n)
     random.shuffle(nodes)
-    for n in nodes:
+    for i, n in enumerate(nodes):
+        _debug('add #%d: %s', i, n)
         root = root.add(n)
         n2 = btree.LeafNode(n.name)
         # Ensure add result looks sane
@@ -77,30 +81,23 @@ def test_large_tree():
 
     print(root.depth, root.csize)
     # Then, with the fully formed tree, ensure nodes can still be found
-    for n in nodes:
+    for i, n in enumerate(nodes):
+        _debug('check #%d: %s', i, n)
         n2 = btree.LeafNode(n.name)
         assert root.search(n2) is n
 
     assert root.depth > 1
 
-    assert root.root == root
-    assert root.children[0].root == root
+    assert root.root is root
+    assert root.children[0].root is root
 
     # Randomly remove nodes from it; the tree should stay fully functional to
     # the bitter end.
     random.shuffle(nodes)
-    for n in nodes:
+    for i, n in enumerate(nodes):
+        _debug('remove #%d: %s', i, n)
         n2 = btree.LeafNode(n.name)
         # Ensure add result looks sane
         assert root.search(n2) is n
         root.remove(n)
     assert root.depth == 1
-
-
-@pytest.mark.xfail(raises=TypeError)
-def test_eq_1():
-    btree.LeafNode(b'x') < 1
-
-
-def test_eq_2():
-    btree.LeafNode(b'x') == 1

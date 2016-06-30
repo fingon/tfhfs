@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 15:36:58 2016 mstenber
-# Last modified: Thu Jun 30 16:14:50 2016 mstenber
-# Edit time:     202 min
+# Last modified: Fri Jul  1 00:35:26 2016 mstenber
+# Edit time:     272 min
 #
 """This is the 'btree' module.
 
@@ -19,7 +19,6 @@ It implements abstract COW-friendly B+ trees.
 """
 
 import bisect
-import functools
 import logging
 
 import mmh3
@@ -29,20 +28,15 @@ _debug = logging.getLogger(__name__).debug
 
 HASH_SIZE = 32  # bytes
 NAME_HASH_SIZE = 4  # bytes
+NAME_HASH_SIZE = 0  # none (for debugging use only)
 NAME_SIZE = 256  # maximum length of single name
 
 
-@functools.total_ordering
 class Node:
 
     header_size = NAME_HASH_SIZE + HASH_SIZE
 
     parent = None
-
-    def __init__(self, *, nwrites=0, lastwrite=0):
-        d = locals().copy()
-        del d['self']
-        self.__dict__.update(d)
 
     @property
     def root(self):
@@ -50,25 +44,14 @@ class Node:
             return self
         return self.parent.root
 
-    def __eq__(self, other):
-        if not isinstance(other, Node):
-            return NotImplemented
-        return self.key == other.key
-
-    def __lt__(self, other):
-        if not isinstance(other, Node):
-            return NotImplemented
-        return self.key < other.key
-
 
 class LeafNode(Node):
 
     name_hash_size = NAME_HASH_SIZE
 
-    def __init__(self, name, **kw):
+    def __init__(self, name):
         assert isinstance(name, bytes)
         self.name = name
-        Node.__init__(self, **kw)
 
     def __repr__(self):
         return '<%s %s>' % (self.__class__.__name__, self.name)
@@ -97,10 +80,11 @@ node. """
 
     # Note: minimum_size + has_spares_size MUST be less than maximum_size
 
-    def __init__(self, **kw):
-        Node.__init__(self, **kw)
+    def __init__(self):
         self.children = []
+        self.child_keys = []
         self.csize = 0
+        self.key = None
 
     def __repr__(self):
         return '<%s >=%s - depth %d>' % (self.__class__.__name__,
@@ -109,12 +93,13 @@ node. """
     def _add_child(self, c):
         assert isinstance(c, Node)
         self.csize += c.size
-        #_debug(' children pre:%s', self.children)
-        bisect.insort(self.children, c)
-        #_debug(' children post:%s', self.children)
+        k = c.key
+        assert k
+        idx = bisect.bisect(self.child_keys, k)
+        self.child_keys.insert(idx, k)
+        self.children.insert(idx, c)
         c.parent = self
-        if self.children[0] == c:
-            self.key = self.children[0].key
+        return idx
 
     def _pop_child(self, idx):
         c = self.children[idx]
@@ -124,26 +109,39 @@ node. """
     def _remove_child(self, c):
         assert isinstance(c, Node)
         self.csize -= c.size
-        idx = self.children.index(c)
+        idx = self.child_keys.index(c.key)
         del self.children[idx]
-        if not idx and self.children:
-            self.key = self.children[0].key
+        del self.child_keys[idx]
+
+    def _update_key_maybe(self, *, force=False):
+        nk = self.child_keys[0]
+        if not self.parent or (not force and self.key <= nk):
+            return
+        idx = self.parent.child_keys.index(self.key)
+        self.parent.child_keys[idx] = nk
+        self.key = nk
+        if not idx:
+            self.parent._update_key_maybe()
 
     def add_child(self, c):
         _debug('add_child %s', c)
-        self._add_child(c)
+        idx = self._add_child(c)
+        if not idx:
+            self._update_key_maybe()
         if self.csize <= self.maximum_size:
             return
         _debug(' too big, splitting')
         tn = self.__class__()
         while self.csize > tn.csize:
             tn._add_child(self._pop_child(-1))
+        tn.key = tn.child_keys[0]
         if self.parent is not None:
             _debug(' did not cause new root')
             return self.parent.add_child(tn)
         # We're root -> Add new level
         _debug(' caused new root')
         tn2 = self.__class__()
+        self.key = self.child_keys[0]
         tn2._add_child(self)
         tn2._add_child(tn)
         return tn2
@@ -152,10 +150,10 @@ node. """
         _debug('adding %s to %s', c, self)
         sc = self.search_prev_or_eq(c)
         if sc:
-            assert sc != c
+            assert sc.key != c.key
             _debug(' closest match: %s', sc)
             return sc.parent.add_child(c) or self
-        assert not self.children
+
         return self.add_child(c) or self
 
     @property
@@ -167,14 +165,14 @@ node. """
     def get_smaller_sib(self):
         if not self.parent:
             return
-        idx = self.parent.children.index(self) - 1
+        idx = self.parent.child_keys.index(self.key) - 1
         if idx >= 0:
             return self.parent.children[idx]
 
     def get_larger_sib(self):
         if not self.parent:
             return
-        idx = self.parent.children.index(self) + 1
+        idx = self.parent.child_keys.index(self.key) + 1
         if idx < len(self.parent.children):
             return self.parent.children[idx]
 
@@ -191,6 +189,10 @@ node. """
             if sib.csize >= self.has_spares_size:
                 while sib.csize >= self.csize:
                     self._add_child(sib._pop_child(idx))
+                if idx == -1:
+                    self._update_key_maybe(force=True)
+                else:
+                    sib._update_key_maybe(force=True)
                 return True
 
         sib = self.get_smaller_sib()
@@ -218,6 +220,8 @@ node. """
         while self.children:
             sib._add_child(self._pop_child(0))
 
+        sib._update_key_maybe()
+
         self.parent.remove_child(self)
 
     @lazy_property
@@ -243,15 +247,17 @@ node. """
             for c2 in c.children:
                 self._add_child(c2)
 
+        # this is root so  no need to worry about .key handling..
+
     def search_prev_or_eq(self, c):
         _debug('search_prev_or_eq %s in %s', c, self)
         n = self
+        k = c.key
         while True:
-            if not n.children:
+            if not n.child_keys:
                 _debug(' no children')
                 return
-            # Find the best child to add it to
-            idx = bisect.bisect_right(n.children, c)
+            idx = bisect.bisect_right(n.child_keys, k)
             if idx:
                 idx -= 1
             n = n.children[idx]
@@ -261,5 +267,5 @@ node. """
 
     def search(self, c):
         sc = self.search_prev_or_eq(c)
-        if sc == c:
+        if sc and sc.key == c.key:
             return sc
