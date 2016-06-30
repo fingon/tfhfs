@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 16:29:53 2016 mstenber
-# Last modified: Thu Jun 30 12:53:54 2016 mstenber
-# Edit time:     22 min
+# Last modified: Thu Jun 30 13:06:10 2016 mstenber
+# Edit time:     27 min
 #
 """
 
@@ -25,11 +25,17 @@ def test_simple():
     tn = forest.TreeNode()
     n1 = forest.LeafNode(b'foo.txt')
     n2 = forest.LeafNode(b'bar.txt')
+    n3 = forest.LeafNode(b'baz.txt')  # not added, used to test search variants
     tn = forest.TreeNode()
 
     # test addition/removal
     tn.add_child(n1)
     tn.add_child(n2)
+
+    assert tn.search_prev_or_eq(n3) == n2
+    assert tn.search(n3) == None
+    assert tn.search(n2) == n2
+
     assert tn.children == [n2, n1]
     tn.remove_child(n2)
     assert tn.children == [n1]
