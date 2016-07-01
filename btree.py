@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 15:36:58 2016 mstenber
-# Last modified: Fri Jul  1 00:35:26 2016 mstenber
+# Last modified: Fri Jul  1 12:21:20 2016 mstenber
 # Edit time:     272 min
 #
 """This is the 'btree' module.
@@ -28,7 +28,7 @@ _debug = logging.getLogger(__name__).debug
 
 HASH_SIZE = 32  # bytes
 NAME_HASH_SIZE = 4  # bytes
-NAME_HASH_SIZE = 0  # none (for debugging use only)
+# NAME_HASH_SIZE = 0  # none (for debugging use only)
 NAME_SIZE = 256  # maximum length of single name
 
 
@@ -58,9 +58,7 @@ class LeafNode(Node):
 
     @lazy_property
     def key(self):
-        b = mmh3.hash_bytes(self.name)
-        if len(b) > self.name_hash_size:
-            b = b[:self.name_hash_size]
+        b = mmh3.hash_bytes(self.name)[:self.name_hash_size]
         return b + self.name
 
     @lazy_property
