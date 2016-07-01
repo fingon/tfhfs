@@ -66,12 +66,18 @@ by the forest layer.
 
 A simple implementation of storage layer would be a normal filesystem
 directory, where e.g. block 1234567890ABCDEF1234567890ABCDEF with reference
-count of 1 is stored within 12/34/56/7890ABCDEF1234567890ABCDEF.1
-file. This scheme scales comfortably to around 10e9 files. (**TBD**: On a
-raw device, you would really want minimal filesystem semantics _here_ to do
-that, but to cover correct flash rewrite semantics offloading that
-logic elsewhere seems like a sane thing to do in any case. I have to think
-about this more.)
+count of 1 is stored within 12/34/56/7890ABCDEF1234567890ABCDEF file, and a
+separate symlink 12/34/56/7890ABCDEF1234567890ABCDEF.l -> 1. This scheme
+scales comfortably to around 10e9 files if the underlying filesystem
+does. Base64 encoding and somewhat smaller directory nesting depth might be
+better in practise (e.g. one base64 character / 2 subsequent base64
+characters / rest works fine with 10e7 files which is probably the order
+of magnitude we are looking for.)
+
+**TBD**: On a raw device, you would really want minimal filesystem
+semantics _here_ to do that, but having someone else take care of correct
+flash rewrite semantics seems like a sane thing to do in any case. I have
+to think about this more.
 
 Another feature required from the storage layer is ability to atomically
 give a human-readable name to a particular hash-identified data block. This
