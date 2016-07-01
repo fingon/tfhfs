@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Thu Jun 30 17:28:28 2016 mstenber
+# Last modified: Fri Jul  1 12:14:09 2016 mstenber
 # Edit time:     158 min
 #
 """
@@ -93,7 +93,7 @@ data within.."""
         assert len(e.tag) == self.tag_len
         enc.encode_bytes(e.tag)
         enc.encode_bytes(s)
-        return enc.get_result()
+        return enc.value
 
     def decode_block(self, block_id, block_data):
         assert (isinstance(block_id, bytes)

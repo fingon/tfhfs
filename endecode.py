@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 16:53:21 2016 mstenber
-# Last modified: Thu Jun 30 17:16:57 2016 mstenber
-# Edit time:     19 min
+# Last modified: Fri Jul  1 12:21:55 2016 mstenber
+# Edit time:     27 min
 #
 """Encoder/Decoder for binary data.
 
@@ -23,6 +23,13 @@ e.g. pybabel-like TLV magic format, or some other endecode library.
 
 """
 
+import base64
+
+# base64 altchars to use; the default +/ is not good, as / is bad
+# within (non-path-containing) filenames. -_ is used in e.g. RFC4648
+# base64url.
+_altchars = b'-_'
+
 
 class Decoder:
 
@@ -32,6 +39,11 @@ class Decoder:
 
     def _left(self):
         return len(self.b) - self.ofs
+
+    def decode_base64url(self):
+        b = self.decode_bytes_rest()
+        b += b'=' * (-len(b) % 4)
+        return base64.b64decode(b, altchars=_altchars, validate=True)
 
     def decode_bytes(self, n):
         assert self._left() >= n
@@ -83,6 +95,10 @@ class Encoder:
     def __init__(self):
         self.l = []
 
+    def encode_base64url(self, b):
+        self.l.append(base64.b64encode(b, altchars=_altchars).rstrip(b'='))
+        return self
+
     def encode_bytes(self, b):
         self.l.append(b)
         return self
@@ -127,5 +143,6 @@ class Encoder:
             self.encode_uint(v * 2 - 1)
         return self
 
-    def get_result(self):
+    @property
+    def value(self):
         return b''.join(self.l)
