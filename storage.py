@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Sat Jul  2 18:58:57 2016 mstenber
-# Edit time:     258 min
+# Last modified: Sat Jul  2 21:16:31 2016 mstenber
+# Edit time:     259 min
 #
 """This is the 'storage layer' main module.
 
@@ -33,6 +33,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
+import const
 import lz4
 from endecode import Decoder, Encoder
 
@@ -144,22 +145,20 @@ class TypedBlockCodec(BlockCodec):
 
 class CompressingTypedBlockCodec(TypedBlockCodec):
 
-    bit_compressed = 0x80
-
     def encode_block(self, block_id, block_data):
         (t, d) = block_data
-        assert not (t & self.bit_compressed)
+        assert not (t & const.BIT_COMPRESSED)
         cd = lz4.compress(d)
         if len(cd) < len(d):
-            t = t | self.bit_compressed
+            t = t | const.BIT_COMPRESSED
             d = cd
         return TypedBlockCodec.encode_block(self, block_id, (t, d))
 
     def decode_block(self, block_id, block_data):
         (t, d) = TypedBlockCodec.decode_block(self, block_id, block_data)
-        if t & self.bit_compressed:
+        if t & const.BIT_COMPRESSED:
             d = lz4.loads(d)
-            t = t & ~self.bit_compressed
+            t = t & ~const.BIT_COMPRESSED
         return (t, d)
 
 

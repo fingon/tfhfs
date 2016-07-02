@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Fri Jul  1 00:45:43 2016 mstenber
-# Edit time:     54 min
+# Last modified: Sat Jul  2 21:21:57 2016 mstenber
+# Edit time:     62 min
 #
 """This is the 'forest layer' main module.
 
@@ -24,21 +24,11 @@ purged as desired.
 """
 
 import hashlib
-from enum import Enum
 
 import cbor
 
 import btree
-
-
-class NodeType(Enum):
-    dirnode = 1  # children are also DirectoryTreeNodes
-    leafydirnode = 2  # children are DirectoryEntries
-
-    filenode = 3  # children are also FileTreeNodes
-    leafyfilenode = 4  # children are FileData
-
-    filedata = 5  # node itself is FileData
+import const
 
 
 class DirectoryEntry(btree.LeafNode):
@@ -58,13 +48,13 @@ class DirectoryTreeNode(btree.TreeNode):
     def from_forest_block_data(cls, forest, d):
         tn = cls(forest)
         (t, d) = d
-        assert t in [Enum.dirnode.value, Enum.leafyfilenode.value]
+        assert t & const.TYPE_MASK == const.TYPE_DIRNODE
         (tn.child_keys, child_data_list) = cbor.loads(d)
         for cd in child_data_list:
-            if t == Enum.dirnode.value:
-                tn2 = cls.from_forest_block_child_data(forest, cd)
-            if t == Enum.leafydirnode.value:
+            if t & const.BIT_LEAFY:
                 tn2 = DirectoryEntry.from_forest_block_child_data(forest, cd)
+            else:
+                tn2 = cls.from_forest_block_child_data(forest, cd)
             tn._add_child(tn2)
 
         return tn
@@ -77,8 +67,10 @@ class DirectoryTreeNode(btree.TreeNode):
         # n/a: 'key' (should be known already)
         l = [self.child_keys,
              [x.to_block_data_child() for x in self.children]]
-        t = self.is_leafy and NodeType.leafydirnode or NodeType.dirnode
-        return (t.value, cbor.dumps(l))
+        t = const.TYPE_DIRNODE
+        if self.leafy:
+            t = t | const.BIT_LEAFY
+        return (t, cbor.dumps(l))
 
     def to_block_data_child(self):
         return self.data
