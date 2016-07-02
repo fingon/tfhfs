@@ -9,15 +9,17 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Fri Jul  1 12:14:09 2016 mstenber
-# Edit time:     158 min
+# Last modified: Sat Jul  2 18:58:57 2016 mstenber
+# Edit time:     258 min
 #
-"""
-
-This is the 'storage layer' main module.
+"""This is the 'storage layer' main module.
 
 It is provides abstract interface for the forest layer to use, and
 uses storage backend for actual raw file operations.
+
+TBD: how to handle maximum_cache_size related flushes? trigger timer
+to flush earlier? within call stack, it is bad idea (to some extent
+this applies also to the maximum_dirty_size)
 
 """
 
@@ -188,13 +190,16 @@ set, None is returned."""
 
     def on_add_block_data(self, block_data):
         for block_id in self.get_block_data_references(block_data):
+            _debug('on_add_block_data add reference to %s', block_id)
             self.refer_block(block_id)
 
     def on_delete_block_id(self, block_id):
         r = self.get_block_by_id(block_id)
         assert r
         (block_data, block_refcnt) = r
+        assert block_data
         for block_id2 in self.get_block_data_references(block_data):
+            _debug('on_delete_block_id %s: drop to %s', block_id, block_id2)
             self.release_block(block_id2)
 
     def refer_block(self, block_id):
@@ -204,15 +209,28 @@ set, None is returned."""
 
     def release_block(self, block_id):
         r = self.get_block_by_id(block_id)
-        assert r and r[1] > 0
+        assert r
         refcnt = r[1] - 1
+        assert refcnt >= 0
         self.set_block_refcnt(block_id, refcnt)
         return refcnt > 0
 
     def set_block_name(self, block_id, n):
-        """ Set name of the block 'block_id' to 'n'.
+        old_block_id = self.get_block_id_by_name(n)
+        if old_block_id == block_id:
+            return
+        if block_id:
+            self.refer_block(block_id)
+        if old_block_id:
+            self.release_block(old_block_id)
+        self.set_block_name_raw(block_id, n)
 
-        This does not change reference counts. """
+    def set_block_name_raw(self, block_id, n):
+        """Set name of the block 'block_id' to 'n'.
+
+        This does not change reference counts and therefore should be
+        mostly used by the internal APIs.
+        """
         raise NotImplementedError
 
     def set_block_refcnt(self, block_id, refcnt):
@@ -283,15 +301,17 @@ mix the two hobby projects for now..
         assert len(r) == 1
         return r[0][0]
 
-    def set_block_name(self, block_id, n):
-        _debug('set_block_name %s %s', block_id, n)
+    def set_block_name_raw(self, block_id, n):
+        assert n
+        _debug('set_block_name_raw %s %s', block_id, n)
         self._get_execute_result(
             'DELETE FROM blocknames WHERE name=?', (n,))
-        self._get_execute_result(
-            'INSERT INTO blocknames VALUES (?, ?)', (n, block_id))
+        if block_id:
+            self._get_execute_result(
+                'INSERT INTO blocknames VALUES (?, ?)', (n, block_id))
 
     def set_block_refcnt(self, block_id, refcnt):
-        _debug('release_block %s', block_id)
+        _debug('set_block_refcnt %s = %d', block_id, refcnt)
 
         # TBD: this is not threadsafe, but what sort of sane person
         # would multithread this backend anyway?
@@ -339,8 +359,6 @@ class DelayedStorage(Storage):
         if block_id not in self._blocks:
             r = self.storage.get_block_by_id(block_id) or (None, 0)
             if r[0] is not None:
-                if self.maximum_cache_size and self.cache_size > self.maximum_cache_size:
-                    self.flush()
                 self.cache_size += len(r[0])
             self._blocks[block_id] = [[r[0], r[1]], r[1], 0, 0]
         r = self._blocks[block_id]
@@ -348,10 +366,19 @@ class DelayedStorage(Storage):
         r[3] += 1
         return r
 
-    def flush(self):
+    def _flush_blocks(self, positive):
         ops = 0
-        for block_id, o in self._blocks.items():
+        for block_id, o in sorted(self._blocks.items()):
             (block_data, block_refcnt), orig_refcnt, _, _ = o
+
+            # The order here is frightfully important!
+            # The following 3 steps do not work in any other order.
+            # (Why? Left as an exercise to the reader)
+            if positive is not None and ((block_refcnt < orig_refcnt) == (not positive)):
+                continue
+            if block_data and not block_refcnt:
+                self.cache_size -= len(block_data)
+                o[0][0] = None
             if block_refcnt == orig_refcnt:
                 continue
             if not orig_refcnt and block_refcnt:
@@ -360,30 +387,67 @@ class DelayedStorage(Storage):
             else:
                 self.storage.set_block_refcnt(block_id, block_refcnt)
             ops += 1
-            o[1] = block_refcnt
+            o[1] = block_refcnt  # replace orig_refcnt with the updated one
+        return ops
+
+    @property
+    def calculated_cache_size(self):
+        v = 0
+        for o in self._blocks.values():
+            (block_data, block_refcnt), orig_refcnt, _, _ = o
+            if block_data:
+                v += len(block_data)
+        return v
+
+    @property
+    def calculated_dirty_size(self):
+        v = 0
+        for o in self._blocks.values():
+            (block_data, block_refcnt), orig_refcnt, _, _ = o
+            if block_data and not orig_refcnt and block_refcnt:
+                v += len(block_data)
+        return v
+
+    def _flush_names(self):
+        ops = 0
         for block_name, o in self._names.items():
             (current_id, orig_id) = o
             if current_id != orig_id:
-                self.storage.set_block_name(current_id, block_name)
+                self.storage.set_block_name_raw(current_id, block_name)
                 o[1] = o[0]
                 ops += 1
-        self.cache_size += self.dirty_size
-        self.dirty_size = 0
+        return ops
+
+    def _shrink_cache(self):
+        goal = self.maximum_cache_size * 3 // 4
+        _debug('_shrink_cache goal=%d < %d', goal, self.cache_size)
+        # try to stay within [3/4 * max, max]
+        l = list(self._blocks.items())
+        l.sort(key=lambda k: k[1][2])  # last used time
+        while l and self.cache_size > goal:
+            (block_id, o) = l.pop(0)
+            del self._blocks[block_id]
+            assert o[1] == o[0][1]  # refcnt must be constant
+            block_data = o[0][0]
+            if block_data:
+                self.cache_size -= len(block_data)
+
+    def flush(self):
+        _debug('flush')
+        ops = 0
+        ops += self._flush_blocks(1)
+        self.dirty_size = 0  # new blocks if any are written to disk by now
+        ops += self._flush_names()
+        ops += self._flush_blocks(None)
         if self.maximum_cache_size and self.cache_size > self.maximum_cache_size:
-            goal = self.maximum_cache_size * 3 / 4
-            # try to stay within [3/4 * max, max]
-            l = list(self._blocks.items())
-            l.sort(key=lambda k: k[1][2])  # last used time
-            while l and self.cache_size > goal:
-                (block_id, o) = l.pop(0)
-                del self._blocks[block_id]
-                block_data = o[0][0]
-                if block_data:
-                    self.cache_size -= len(block_data)
+            self._shrink_cache()
+        _debug(' => %d ops', ops)
         return ops
 
     def get_block_by_id(self, block_id):
+        _debug('%s.get_block_by_id %s', self.__class__.__name__, block_id)
         r = self._get_block_by_id(block_id)[0]
+        _debug(' => %s', r)
         if not r[1]:  # no refcnt -> no object
             return
         return r
@@ -397,23 +461,21 @@ class DelayedStorage(Storage):
     def get_block_id_by_name(self, n):
         return self._get_block_id_by_name(n)[0]
 
-    def set_block_name(self, block_id, n):
+    def set_block_name_raw(self, block_id, n):
         self._get_block_id_by_name(n)[0] = block_id
 
     def set_block_refcnt(self, block_id, refcnt):
+        _debug('%s.set_block_refcnt %s = %d',
+               self.__class__.__name__, block_id, refcnt)
         r = self._get_block_by_id(block_id)
-        if refcnt:
-            r[0][1] = refcnt
-            return
-        self.on_delete_block_id(block_id)
-        r[0][1] = 0
-        if not r[1]:
-            self.dirty_size -= len(r[0][0])
-        else:
-            self.cache_size -= len(r[0][0])
-        r[0][0] = None
+        assert r
+        if not refcnt:
+            self.on_delete_block_id(block_id)
+        r[0][1] = refcnt
+        _debug(' => %s', r)
 
     def store_block(self, block_id, block_data, *, refcnt=1):
+        _debug('store_block %s', block_id)
         r = self._get_block_by_id(block_id)
         assert r[0][0] is None
         assert block_data
@@ -421,5 +483,7 @@ class DelayedStorage(Storage):
         r[0][0] = block_data
         r[0][1] = refcnt
         self.dirty_size += len(block_data)
-        if self.maximum_dirty_size and self.dirty_size > self.maximum_dirty_size:
+        self.cache_size += len(block_data)
+        if (self.maximum_dirty_size and
+                self.dirty_size > self.maximum_dirty_size):
             self.flush()
