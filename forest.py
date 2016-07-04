@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Sat Jul  2 21:21:57 2016 mstenber
-# Edit time:     62 min
+# Last modified: Mon Jul  4 21:20:33 2016 mstenber
+# Edit time:     80 min
 #
 """This is the 'forest layer' main module.
 
@@ -34,34 +34,67 @@ import const
 class DirectoryEntry(btree.LeafNode):
 
     @classmethod
-    def from_forest_block_child_data(cls, forest, d):
-        pass
+    def from_forest_interned_data(cls, forest, d):
+        raise NotImplementedError
 
 
 class DirectoryTreeNode(btree.TreeNode):
 
-    def __init__(self, forest):
-        self.forest = forest
+    _loaded = False
+
+    def __init__(self, forest, block_id=None):
+        self._forest = forest
+        self._block_id = block_id
         btree.TreeNode.__init__(self)
 
-    @classmethod
-    def from_forest_block_data(cls, forest, d):
-        tn = cls(forest)
-        (t, d) = d
-        assert t & const.TYPE_MASK == const.TYPE_DIRNODE
-        (tn.child_keys, child_data_list) = cbor.loads(d)
-        for cd in child_data_list:
-            if t & const.BIT_LEAFY:
-                tn2 = DirectoryEntry.from_forest_block_child_data(forest, cd)
-            else:
-                tn2 = cls.from_forest_block_child_data(forest, cd)
-            tn._add_child(tn2)
+    @property
+    def child_keys(self):
+        if not self._loaded:
+            self.load()
+            assert self._loaded
+        return self._child_keys
 
+    @property
+    def children(self):
+        if not self._loaded:
+            self.load()
+            assert self._loaded
+        return self._children
+
+    @classmethod
+    def from_forest_block_id(cls, forest, block_id):
+        tn = cls(forest)
+        tn._block_id = block_id
+        tn.load()
         return tn
 
     @classmethod
-    def from_forest_block_child_data(cls, forest, d):
-        pass
+    def from_forest_interned_data(cls, forest, d):
+        raise NotImplementedError
+
+    def load(self):
+        assert not self._loaded
+        data = self._forest.storage.get_block_data_by_id(self._block_id)
+        if data is not None:
+            self.load_from_forest_data(self._block_id, data)
+        else:
+            # otherwise we are already empty node
+            self._loaded = True
+
+    def load_from_forest_data(self, block_id, d):
+        self._loaded = True
+        self._block_id = block_id
+        (t, d) = d
+        assert t & const.TYPE_MASK == const.TYPE_DIRNODE
+        (self.key, self.child_keys, child_data_list) = cbor.loads(d)
+        for cd in child_data_list:
+            if t & const.BIT_LEAFY:
+                cls2 = DirectoryEntry
+            else:
+                cls2 = cls2
+            tn2 = cls2.from_forest_interned_data(self._forest, cd)
+            self._add_child(tn2)
+        return self
 
     def to_block_data(self):
         # n/a: 'key' (should be known already)
@@ -98,11 +131,4 @@ class Forest:
         self.inode2tree[root_inode] = tn
 
     def load_directory_node_from_block(self, block_id):
-        data = self.storage.get_block_data_by_id(block_id)
-        tn = DirectoryTreeNode()
-        # empty, new tree if it did not exist
-        if data is None:
-            return tn
-        # block _did_ exist.
-        (t, d) = data
-        return DirectoryTreeNode.from_forest_data(self, d)
+        return DirectoryTreeNode.from_forest_block_id(self, block_id)

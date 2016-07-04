@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 15:36:58 2016 mstenber
-# Last modified: Fri Jul  1 12:21:20 2016 mstenber
-# Edit time:     272 min
+# Last modified: Mon Jul  4 21:06:58 2016 mstenber
+# Edit time:     273 min
 #
 """This is the 'btree' module.
 
@@ -79,8 +79,8 @@ node. """
     # Note: minimum_size + has_spares_size MUST be less than maximum_size
 
     def __init__(self):
-        self.children = []
-        self.child_keys = []
+        self._children = []
+        self._child_keys = []
         self.csize = 0
         self.key = None
 
@@ -153,6 +153,14 @@ node. """
             return sc.parent.add_child(c) or self
 
         return self.add_child(c) or self
+
+    @property
+    def children(self):
+        return self._children
+
+    @property
+    def child_keys(self):
+        return self._child_keys
 
     @property
     def depth(self):
