@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 15:36:58 2016 mstenber
-# Last modified: Mon Jul  4 21:06:58 2016 mstenber
-# Edit time:     273 min
+# Last modified: Tue Jul  5 13:19:01 2016 mstenber
+# Edit time:     280 min
 #
 """This is the 'btree' module.
 
@@ -49,9 +49,10 @@ class LeafNode(Node):
 
     name_hash_size = NAME_HASH_SIZE
 
-    def __init__(self, name):
-        assert isinstance(name, bytes)
-        self.name = name
+    def __init__(self, name=None):
+        if name is not None:
+            assert isinstance(name, bytes)
+            self.name = name
 
     def __repr__(self):
         return '<%s %s>' % (self.__class__.__name__, self.name)
@@ -88,7 +89,7 @@ node. """
         return '<%s >=%s - depth %d>' % (self.__class__.__name__,
                                          self.key, self.depth)
 
-    def _add_child(self, c):
+    def _add_child(self, c, *, skip_dirty=False):
         assert isinstance(c, Node)
         self.csize += c.size
         k = c.key
@@ -97,6 +98,8 @@ node. """
         self.child_keys.insert(idx, k)
         self.children.insert(idx, c)
         c.parent = self
+        if not skip_dirty and self.mark_dirty() and self.parent:
+            self.parent.mark_dirty()
         return idx
 
     def _pop_child(self, idx):
@@ -110,6 +113,8 @@ node. """
         idx = self.child_keys.index(c.key)
         del self.children[idx]
         del self.child_keys[idx]
+        if self.mark_dirty() and self.parent:
+            self.parent.mark_dirty()
 
     def _update_key_maybe(self, *, force=False):
         nk = self.child_keys[0]
@@ -185,6 +190,11 @@ node. """
     @property
     def is_leafy(self):
         return not self.children or not isinstance(self.children[0], TreeNode)
+
+    def mark_dirty(self):
+        """Mark the node dirty. If it returns true, the set was 'new' (and
+should be propagated upwards in the tree)."""
+        return False
 
     def remove_child(self, c):
         self._remove_child(c)
@@ -263,11 +273,13 @@ node. """
             if not n.child_keys:
                 _debug(' no children')
                 return
+            _debug(' child_keys %s', n.child_keys)
             idx = bisect.bisect_right(n.child_keys, k)
             if idx:
                 idx -= 1
+            _debug(' idx %d', idx)
             n = n.children[idx]
-            _debug(' idx %d = %s', idx, n)
+            _debug(' = %s', n)
             if not isinstance(n, TreeNode):
                 return n
 

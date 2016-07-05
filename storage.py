@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Sat Jul  2 21:16:31 2016 mstenber
-# Edit time:     259 min
+# Last modified: Tue Jul  5 12:23:28 2016 mstenber
+# Edit time:     262 min
 #
 """This is the 'storage layer' main module.
 
@@ -205,6 +205,17 @@ set, None is returned."""
         r = self.get_block_by_id(block_id)
         assert r
         self.set_block_refcnt(block_id, r[1] + 1)
+
+    def refer_or_store_block(self, block_id, block_data):
+        """Convenience method for handling the common case of 'we have these
+bytes, no clue if the block is already inserted (by someone else) ->
+either refer to existing one, or add new block to the storage
+layer."""
+        r = self.get_block_by_id(block_id)
+        if r:
+            self.refer_block(block_id)
+        else:
+            self.store_block(block_id, block_data)
 
     def release_block(self, block_id):
         r = self.get_block_by_id(block_id)
