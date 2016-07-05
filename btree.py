@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 15:36:58 2016 mstenber
-# Last modified: Tue Jul  5 13:19:01 2016 mstenber
-# Edit time:     280 min
+# Last modified: Tue Jul  5 15:29:14 2016 mstenber
+# Edit time:     284 min
 #
 """This is the 'btree' module.
 
@@ -98,8 +98,8 @@ node. """
         self.child_keys.insert(idx, k)
         self.children.insert(idx, c)
         c.parent = self
-        if not skip_dirty and self.mark_dirty() and self.parent:
-            self.parent.mark_dirty()
+        if not skip_dirty:
+            self.mark_dirty()
         return idx
 
     def _pop_child(self, idx):
@@ -113,8 +113,7 @@ node. """
         idx = self.child_keys.index(c.key)
         del self.children[idx]
         del self.child_keys[idx]
-        if self.mark_dirty() and self.parent:
-            self.parent.mark_dirty()
+        self.mark_dirty()
 
     def _update_key_maybe(self, *, force=False):
         nk = self.child_keys[0]
@@ -134,7 +133,7 @@ node. """
         if self.csize <= self.maximum_size:
             return
         _debug(' too big, splitting')
-        tn = self.__class__()
+        tn = self.create()
         while self.csize > tn.csize:
             tn._add_child(self._pop_child(-1))
         tn.key = tn.child_keys[0]
@@ -143,7 +142,7 @@ node. """
             return self.parent.add_child(tn)
         # We're root -> Add new level
         _debug(' caused new root')
-        tn2 = self.__class__()
+        tn2 = self.create()
         self.key = self.child_keys[0]
         tn2._add_child(self)
         tn2._add_child(tn)
@@ -166,6 +165,10 @@ node. """
     @property
     def child_keys(self):
         return self._child_keys
+
+    def create(self):
+        """ Given 'self', create another instance of same class. """
+        return self.__class__()
 
     @property
     def depth(self):
