@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Jul  5 11:49:58 2016 mstenber
-# Last modified: Tue Jul  5 15:39:35 2016 mstenber
-# Edit time:     24 min
+# Last modified: Thu Jul 28 13:29:28 2016 mstenber
+# Edit time:     29 min
 #
 """
 
@@ -90,7 +90,11 @@ def test_forest():
     subdir.set_data('x', 43)
     assert subdir.dirty
     # assert f.root.dirty # n/a; the dirtiness is propagated during flush
+
+    old_root_block_id = root._block_id
+    assert old_root_block_id
     assert f.flush()
+    assert root._block_id != old_root_block_id
     assert not f.flush()
 
 
