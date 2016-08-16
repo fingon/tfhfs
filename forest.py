@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Tue Jul  5 15:40:38 2016 mstenber
-# Edit time:     233 min
+# Last modified: Tue Aug 16 11:55:03 2016 mstenber
+# Edit time:     247 min
 #
 """This is the 'forest layer' main module.
 
@@ -89,7 +89,38 @@ class DataMixin(DirtyMixin):
             self.mark_dirty()
 
 
-class LoadedTreeNode(DataMixin, btree.TreeNode):
+class EncodeDecodeMixin:
+
+    # This dict must be provided by child, it represents the mapping
+    # of internal -> external property names. Inverse one is
+    # calculated dynamically.
+    internal2external_dict = {}
+
+    @property
+    def external2internal_dict(self):
+        d = {v: k for k, v in self.internal2external_dict.items()}
+        # Replace it in the class; this way, only one call per class
+        setattr(self.__class__, 'external2internal_dict', d)
+        return d
+
+    def decode(self, d):
+        value_dict = cbor.loads(d)
+        for k, v in value_dict.items():
+            setattr(self, self.external2internal_dict[k], v)
+        return self
+
+    def encode(self):
+        d = {self.internal2external_dict[k]: getattr(
+            self, k) for k in self.internal2external_dict.keys()}
+        return cbor.dumps(d)
+
+
+class LoadedTreeNode(EncodeDecodeMixin, DataMixin, btree.TreeNode):
+
+    internal2external_dict = dict(
+        key='k', _block_id='b', _data='d'
+    )
+
     _loaded = False
 
     def __init__(self, forest, block_id=None):
@@ -141,13 +172,9 @@ class LoadedTreeNode(DataMixin, btree.TreeNode):
                 cls2 = self.leaf_class
             else:
                 cls2 = self.__class__
-            tn2 = cls2(self._forest).load_interned_data(cd)
+            tn2 = cls2(self._forest).decode(cd)
             self._add_child(tn2, skip_dirty=True)
         assert len(self._child_keys) == len(self._children)
-        return self
-
-    def load_interned_data(self, d):
-        (self.key, self._block_id, self._data) = cbor.loads(d)
         return self
 
     def mark_dirty_related(self):
@@ -163,27 +190,29 @@ class LoadedTreeNode(DataMixin, btree.TreeNode):
             child.flush()
         data = self.to_data()
         block_id = _sha256(*data)
-        if block_id != self._block_id:
-            self._forest.storage.refer_or_store_block(block_id, data)
-            if self._block_id is not None:
-                self._forest.storage.release_block(self._block_id)
-            self._block_id = block_id
-            return True
+        if block_id == self._block_id:
+            return
+        self._forest.storage.refer_or_store_block(block_id, data)
+        if self._block_id is not None:
+            self._forest.storage.release_block(self._block_id)
+        self._block_id = block_id
+        return True
 
     def to_data(self):
         # n/a: 'key' (should be known already)
         l = [self.key, self.data,
-             [x.to_interned_data() for x in self.children]]
+             [x.encode() for x in self.children]]
         t = self.entry_type
         if self.is_leafy:
             t = t | const.BIT_LEAFY
         return (t, cbor.dumps(l))
 
-    def to_interned_data(self):
-        return cbor.dumps((self.key, self._block_id, self._data))
 
+class DirectoryEntry(EncodeDecodeMixin, DataMixin, btree.LeafNode):
 
-class DirectoryEntry(DataMixin, btree.LeafNode):
+    internal2external_dict = dict(
+        name='n', _block_id='b', _data='d'
+    )
 
     _inode = None  # of the child that we represent
 
@@ -215,13 +244,6 @@ class DirectoryEntry(DataMixin, btree.LeafNode):
         if inode:
             self._forest.inode2deps[inode].add(self)
         self.mark_dirty()
-
-    def load_interned_data(self, d):
-        (self.name, self._block_id, self._data) = cbor.loads(d)
-        return self
-
-    def to_interned_data(self):
-        return cbor.dumps((self.name, self._block_id, self._data))
 
 
 class DirectoryTreeNode(LoadedTreeNode):
