@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Tue Aug 16 11:55:03 2016 mstenber
-# Edit time:     247 min
+# Last modified: Tue Aug 16 12:44:50 2016 mstenber
+# Edit time:     248 min
 #
 """This is the 'forest layer' main module.
 
@@ -215,10 +215,10 @@ class DirectoryEntry(EncodeDecodeMixin, DataMixin, btree.LeafNode):
     )
 
     _inode = None  # of the child that we represent
+    _block_id = None
 
     def __init__(self, forest):
         self._forest = forest
-        self._block_id = None
         btree.LeafNode.__init__(self)
 
     def perform_flush(self):
