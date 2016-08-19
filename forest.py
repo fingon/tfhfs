@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Tue Aug 16 12:44:50 2016 mstenber
-# Edit time:     248 min
+# Last modified: Fri Aug 19 07:57:06 2016 mstenber
+# Edit time:     277 min
 #
 """This is the 'forest layer' main module.
 
@@ -31,6 +31,7 @@ import cbor
 
 import btree
 import const
+from ms.lazy import lazy_property
 
 _debug = logging.getLogger(__name__).debug
 
@@ -89,37 +90,45 @@ class DataMixin(DirtyMixin):
             self.mark_dirty()
 
 
-class EncodeDecodeMixin:
+class CBORPickler:
 
-    # This dict must be provided by child, it represents the mapping
-    # of internal -> external property names. Inverse one is
-    # calculated dynamically.
-    internal2external_dict = {}
+    def __init__(self, internal2external_dict):
+        self.internal2external_dict = internal2external_dict
 
-    @property
+    @lazy_property
     def external2internal_dict(self):
         d = {v: k for k, v in self.internal2external_dict.items()}
-        # Replace it in the class; this way, only one call per class
-        setattr(self.__class__, 'external2internal_dict', d)
         return d
 
-    def decode(self, d):
-        value_dict = cbor.loads(d)
-        for k, v in value_dict.items():
-            setattr(self, self.external2internal_dict[k], v)
-        return self
+    def dumps(self, o):
+        return cbor.dumps(self.get_dict(o))
 
-    def encode(self):
-        d = {self.internal2external_dict[k]: getattr(
-            self, k) for k in self.internal2external_dict.keys()}
-        return cbor.dumps(d)
+    def load_to(self, d, o):
+        self.set_dict_to(cbor.loads(d), o)
+        return o
+
+    def get_dict(self, o):
+        d = {self.internal2external_dict[k]: getattr(o, k)
+             for k in self.internal2external_dict.keys()}
+        return d
+
+    def set_dict_to(self, d, o):
+        for k, v in d.items():
+            k2 = self.external2internal_dict[k]
+            setattr(o, k2, v)
 
 
-class LoadedTreeNode(EncodeDecodeMixin, DataMixin, btree.TreeNode):
+class LoadedTreeNode(DataMixin, btree.TreeNode):
 
-    internal2external_dict = dict(
-        key='k', _block_id='b', _data='d'
-    )
+    # 'pickler' is used to en/decode references to this object.
+    pickler = CBORPickler(dict(key='k', _block_id='b', _data='d'))
+
+    # 'content_pickler' is used to en/decode content of this object.
+    # type is not within, as it is part of 'storage' (as it has
+    # also compressed bit).
+    content_pickler = CBORPickler(dict(key='k',
+                                       _data='d',
+                                       pickled_child_list='l'))
 
     _loaded = False
 
@@ -166,14 +175,8 @@ class LoadedTreeNode(EncodeDecodeMixin, DataMixin, btree.TreeNode):
         self._loaded = True
         (t, d) = d
         assert t & const.TYPE_MASK == self.entry_type
-        (self.key, self._data, child_data_list) = cbor.loads(d)
-        for cd in child_data_list:
-            if t & const.BIT_LEAFY:
-                cls2 = self.leaf_class
-            else:
-                cls2 = self.__class__
-            tn2 = cls2(self._forest).decode(cd)
-            self._add_child(tn2, skip_dirty=True)
+        self._was_stored_leafy = t & const.BIT_LEAFY
+        self.content_pickler.load_to(d, self)
         assert len(self._child_keys) == len(self._children)
         return self
 
@@ -198,21 +201,31 @@ class LoadedTreeNode(EncodeDecodeMixin, DataMixin, btree.TreeNode):
         self._block_id = block_id
         return True
 
+    @property
+    def pickled_child_list(self):
+        return [x.pickler.get_dict(x) for x in self.children]
+
+    @pickled_child_list.setter
+    def pickled_child_list(self, child_data_list):
+        for cd in child_data_list:
+            if self._was_stored_leafy:
+                cls2 = self.leaf_class
+            else:
+                cls2 = self.__class__
+            tn2 = cls2(self._forest)
+            tn2.pickler.set_dict_to(cd, tn2)
+            self._add_child(tn2, skip_dirty=True)
+
     def to_data(self):
-        # n/a: 'key' (should be known already)
-        l = [self.key, self.data,
-             [x.encode() for x in self.children]]
         t = self.entry_type
         if self.is_leafy:
             t = t | const.BIT_LEAFY
-        return (t, cbor.dumps(l))
+        return (t, self.content_pickler.dumps(self))
 
 
-class DirectoryEntry(EncodeDecodeMixin, DataMixin, btree.LeafNode):
+class DirectoryEntry(DataMixin, btree.LeafNode):
 
-    internal2external_dict = dict(
-        name='n', _block_id='b', _data='d'
-    )
+    pickler = CBORPickler(dict(name='n', _block_id='b', _data='d'))
 
     _inode = None  # of the child that we represent
     _block_id = None
