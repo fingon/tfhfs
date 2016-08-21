@@ -1,0 +1,20 @@
+-*- outline -*-
+
+* Pending (short-term)
+
+** Add reference counting to forest module
+
+** Add missing functionality to forest module (e.g. remove API?)
+
+** Write ops module so that it uses forest for heavy lifting
+
+** Write more thorough filesystem tests to test_ops or elsewhere
+
+*** readdir semantics
+
+mutation should not result in non-mutated files being omitted/returned
+twice (this should be trivially given we iterate automatically by
+filename within the tree order?) 
+
+* Pending (eventually)
+
