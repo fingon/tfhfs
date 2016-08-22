@@ -2,6 +2,11 @@
 
 * Pending (short-term)
 
+** Add TYPE_FILENODE / TYPE_FILEDATA handling as well to forest module
+
+TYPE_FILENODEs will represent large files, and individual TYPE_FILEDATA
+represents small (= single block-sized) files.
+
 ** Add reference counting to forest module
 
 ** Add missing functionality to forest module (e.g. remove API?)

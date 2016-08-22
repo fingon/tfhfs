@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Fri Aug 19 07:57:06 2016 mstenber
-# Edit time:     277 min
+# Last modified: Mon Aug 22 19:12:17 2016 mstenber
+# Edit time:     286 min
 #
 """This is the 'forest layer' main module.
 
@@ -18,8 +18,15 @@ It implements nested tree concept, with an interface to the storage
 layer.
 
 While on-disk snapshot is always static, more recent, in-memory one is
-definitely not. Flushed-to-disk parts of the tree m ay be eventually
+definitely not. Flushed-to-disk parts of the tree may be eventually
 purged as desired.
+
+Inode numbers are dynamic and reference counted; they are never stored
+to disk, but instead are used only to identify objects that
+potentially dynamically change underneath - as the datastructures are
+essentially immutable, the copy-on-write semantics will create
+e.g. new btree hierarchies on changes, but inode numbers allow access
+to particular subdirectory even over mutations.
 
 """
 
