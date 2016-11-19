@@ -4,8 +4,9 @@
 
 ** Add TYPE_FILENODE / TYPE_FILEDATA handling as well to forest module
 
-TYPE_FILENODEs will represent large files, and individual TYPE_FILEDATA
-represents small (= single block-sized) files.
+TYPE_FILENODEs will represent large files (contains subtree of nodes with
+blocks), and individual TYPE_FILEDATA represents small (= single
+block-sized) files.
 
 ** Add reference counting to forest module
 

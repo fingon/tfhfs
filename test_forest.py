@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Jul  5 11:49:58 2016 mstenber
-# Last modified: Thu Jul 28 13:29:28 2016 mstenber
-# Edit time:     29 min
+# Last modified: Sat Nov 19 10:43:02 2016 mstenber
+# Edit time:     30 min
 #
 """
 
@@ -31,8 +31,8 @@ class LeafierDirectoryTreeNode(forest.DirectoryTreeNode):
 def test_forest():
     storage = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
     f = forest.Forest(storage, 42)
-    assert not f.get_dir_inode(7)
-    root = f.get_dir_inode(42)
+    assert not f.get_inode(7)
+    root = f.get_inode(42)
     assert root
     root2 = f.root
     assert root is root2

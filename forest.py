@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Mon Aug 22 19:12:17 2016 mstenber
-# Edit time:     286 min
+# Last modified: Sat Nov 19 10:47:34 2016 mstenber
+# Edit time:     327 min
 #
 """This is the 'forest layer' main module.
 
@@ -127,12 +127,14 @@ class CBORPickler:
 
 class LoadedTreeNode(DataMixin, btree.TreeNode):
 
-    # 'pickler' is used to en/decode references to this object.
+    # 'pickler' is used to en/decode references to this object within
+    # other nodes closer to the root of the tree.
     pickler = CBORPickler(dict(key='k', _block_id='b', _data='d'))
 
     # 'content_pickler' is used to en/decode content of this object.
-    # type is not within, as it is part of 'storage' (as it has
-    # also compressed bit).
+    # type is not within, as it is part of 'storage' (as it has also
+    # compressed bit). pickled_child_list contains references handled
+    # via 'pickler'.
     content_pickler = CBORPickler(dict(key='k',
                                        _data='d',
                                        pickled_child_list='l'))
@@ -230,12 +232,11 @@ class LoadedTreeNode(DataMixin, btree.TreeNode):
         return (t, self.content_pickler.dumps(self))
 
 
-class DirectoryEntry(DataMixin, btree.LeafNode):
-
+class NamedLeafNode(DataMixin, btree.LeafNode):
     pickler = CBORPickler(dict(name='n', _block_id='b', _data='d'))
 
-    _inode = None  # of the child that we represent
     _block_id = None
+    _inode = None  # of the child that we represent
 
     def __init__(self, forest):
         self._forest = forest
@@ -243,19 +244,24 @@ class DirectoryEntry(DataMixin, btree.LeafNode):
 
     def perform_flush(self):
         if self._inode is not None:
-            c = self._forest.get_dir_inode(self._inode)
+            c = self._forest.get_inode(self._inode)
             if c:
                 c.flush()
                 assert c._block_id
-                if self._block_id != c._block_id:
-                    if self._block_id:
-                        self._forest.storage.release_block(self._block_id)
-                    self._block_id = c._block_id
-                    self._forest.storage.refer_block(c._block_id)
+                self.set_block_id(c._block_id)
         return True
 
+    def set_block_id(self, block_id):
+        if self._block_id == block_id:
+            return
+        if self._block_id:
+            self._forest.storage.release_block(self._block_id)
+        self._block_id = block_id
+        self._forest.storage.refer_block(block_id)
+
     def set_inode(self, inode):
-        """ For the run-time, mark that this DirectoryEntry has a whole subtree which is determined by particular inode. """
+        """For the run-time, mark that this object has a whole subtree which
+is determined by particular inode."""
         if self._inode == inode:
             return
         if self._inode and self._inode in self._forest.inode2deps:
@@ -266,14 +272,28 @@ class DirectoryEntry(DataMixin, btree.LeafNode):
         self.mark_dirty()
 
 
+class DirectoryEntry(NamedLeafNode):
+    pass
+
+
 class DirectoryTreeNode(LoadedTreeNode):
     leaf_class = DirectoryEntry
     entry_type = const.TYPE_DIRNODE
 
 
+class FileBlockEntry(NamedLeafNode):
+    name_hash_size = 0
+
+
+class FileBlockTreeNode(LoadedTreeNode):
+    leaf_class = FileBlockEntry
+    entry_Type = const.TYPE_FILENODE
+
+
 class Forest:
 
     directory_node_class = DirectoryTreeNode
+    file_node_class = FileBlockTreeNode
 
     def __init__(self, storage, root_inode):
         self.inode2node = {}  # inode -> DirectoryTreeNode root
@@ -287,22 +307,6 @@ class Forest:
         self.root_inode = root_inode
         self.dirty_node_set = set()
 
-    def flush(self):
-        _debug('flush')
-        while self.dirty_node_set:
-            self.dirty_node_set, dns = set(), self.dirty_node_set
-            for node in dns:
-                inode = self.node2inode.get(node)
-                if inode:
-                    for node2 in self.inode2deps.get(inode, []):
-                        node2.mark_dirty()
-
-        r = self.root.flush()
-        if r:
-            _debug(' new content_id %s', self.root._block_id)
-            self.storage.set_block_name(self.root._block_id, b'content')
-        return r
-
     def add_child(self, tn, cn):
         assert tn.parent is None
         ntn = tn.add(cn)
@@ -312,35 +316,65 @@ class Forest:
         inode = self.node2inode.get(tn)
         if inode:
             del self.node2inode[tn]
-            self.node2inode[ntn] = inode
-            self.inode2node[inode] = ntn
+        self._add_inode(inode, ntn)
 
-    def create_dir_inode(self, inode=None):
+    def _add_inode(self, inode, tn):
+        self.node2inode[tn] = inode
+        self.inode2node[inode] = tn
+
+    def _create_inode(self, is_directory, *, inode=None):
         if inode is None:
             inode = self.first_free_inode
             self.first_free_inode += 1
         tn = self.directory_node_class(self)
         tn._loaded = True
         tn.dirty = True
-        self.inode2node[inode] = tn
-        self.node2inode[tn] = inode
+        self._add_inode(inode, tn)
         return inode, tn
 
-    def get_dir_inode(self, i):
+    def create_dir_inode(self, **kw):
+        return self._create_inode(True, **kw)
+
+    def create_file_inode(self, **kw):
+        return self._create_inode(False, **kw)
+
+    def flush(self):
+        _debug('flush')
+        while self.dirty_node_set:
+            self.dirty_node_set, dns = set(), self.dirty_node_set
+            for node in dns:
+                inode = self.node2inode.get(node)
+                for node2 in self.inode2deps.get(inode, []):
+                    node2.mark_dirty()
+
+        r = self.root.flush()
+        if r:
+            _debug(' new content_id %s', self.root._block_id)
+            self.storage.set_block_name(self.root._block_id, b'content')
+        return r
+
+    def get_inode(self, i):
         if i in self.inode2node:
             return self.inode2node[i]
         if i == self.root_inode:
             block_id = self.storage.get_block_id_by_name(b'content')
-            tn = self.load_directory_node_from_block(block_id)
+            tn = self.load_dir_node_from_block(block_id)
             self.inode2node[i] = tn
             self.node2inode[tn] = i
             return tn
 
-    def load_directory_node_from_block(self, block_id):
-        tn = self.directory_node_class(self).load(block_id)
+    def _load_node_from_block(self, is_dir, block_id):
+        cl = is_dir and self.directory_node_class or self.file_node_class
+        tn = cl(self).load(block_id)
         assert tn.is_loaded
         return tn
 
+    def load_dir_node_from_block(self, block_id):
+        return self._load_node_from_block(True, block_id)
+
+    def load_file_node_from_block(self, block_id):
+        return self._load_node_from_block(False, block_id)
+
     @property
     def root(self):
-        return self.get_dir_inode(self.root_inode)
+        return self.get_inode(self.root_inode)
