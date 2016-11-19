@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Sat Nov 19 11:12:40 2016 mstenber
-# Edit time:     333 min
+# Last modified: Sat Nov 19 11:39:36 2016 mstenber
+# Edit time:     345 min
 #
 """This is the 'forest layer' main module.
 
@@ -321,26 +321,35 @@ class Forest:
         if inode:
             del self.node2inode[tn]
         self._add_inode(inode, ntn)
+        return ntn
 
     def _add_inode(self, inode, tn):
         self.node2inode[tn] = inode
         self.inode2node[inode] = tn
 
-    def _create_inode(self, is_directory, *, inode=None):
+    def _create(self, is_directory, tn, name):
+        inode_sub, sub = self._create_inode(is_directory)
+        leaf = sub.leaf_class(self, name=name)
+        leaf.set_inode(inode_sub)
+        tn = self.add_child(tn, leaf)
+        return tn, leaf, sub
+
+    def _create_inode(self, is_directory, *, inode=None, **kw):
         if inode is None:
             inode = self.first_free_inode
             self.first_free_inode += 1
-        tn = self.directory_node_class(self)
+        cl = is_directory and self.directory_node_class or self.file_node_class
+        tn = cl(self, **kw)
         tn._loaded = True
         tn.dirty = True
         self._add_inode(inode, tn)
         return inode, tn
 
-    def create_dir_inode(self, **kw):
-        return self._create_inode(True, **kw)
+    def create_dir(self, tn, name):
+        return self._create(True, tn, name)
 
-    def create_file_inode(self, **kw):
-        return self._create_inode(False, **kw)
+    def create_file(self, tn, name):
+        return self._create(False, tn, name)
 
     def flush(self):
         _debug('flush')
@@ -366,6 +375,9 @@ class Forest:
             self.inode2node[i] = tn
             self.node2inode[tn] = i
             return tn
+
+    def get_node_inode(self, n):
+        return self.node2inode.get(n)
 
     def _load_node_from_block(self, is_dir, block_id):
         cl = is_dir and self.directory_node_class or self.file_node_class

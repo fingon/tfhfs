@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Jul  5 11:49:58 2016 mstenber
-# Last modified: Sat Nov 19 11:11:34 2016 mstenber
-# Edit time:     31 min
+# Last modified: Sat Nov 19 11:40:42 2016 mstenber
+# Edit time:     35 min
 #
 """
 
@@ -63,12 +63,8 @@ def test_forest():
     assert not f2.root.dirty
 
     # add a directory
-    inode_subdir, subdir = f.create_dir_inode()
-    de2 = forest.DirectoryEntry(f)
-    de2.name = b'bar'
-
-    assert not f.root.dirty
-    f.add_child(f.root, de2)
+    _root, de2, subdir = f.create_dir(f.root, name=b'bar')
+    inode_subdir = f.get_node_inode(subdir)
     assert f.root.dirty
     de2.set_inode(inode_subdir)
     assert de2 in f.inode2deps.get(inode_subdir, [])
@@ -104,9 +100,7 @@ def test_larger_forest():
     f = forest.Forest(storage, 42)
     f.directory_node_class = LeafierDirectoryTreeNode
     for i in range(100):
-        de = forest.DirectoryEntry(f)
-        de.name = b'foo%d' % i
-        f.add_child(f.root, de)
+        _root, de, _subdir = f.create_dir(f.root, name=b'foo%d' % i)
     f.flush()
 
     storage2 = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
