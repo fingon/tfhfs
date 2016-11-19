@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Jul  5 11:49:58 2016 mstenber
-# Last modified: Sat Nov 19 10:43:02 2016 mstenber
-# Edit time:     30 min
+# Last modified: Sat Nov 19 11:11:34 2016 mstenber
+# Edit time:     31 min
 #
 """
 
@@ -48,11 +48,12 @@ def test_forest():
     assert f2.root.data['test'] == 42
 
     # add a 'file'
-    de1 = forest.DirectoryEntry(f)
-    de1.name = b'foo'
+    de1 = forest.DirectoryEntry(f, name=b'foo')
     f.add_child(f.root, de1)
     assert f.flush()
     assert not f.flush()
+
+    assert f.root.search_name(b'foo') == de1
 
     storage2 = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
     storage2.conn = storage.conn

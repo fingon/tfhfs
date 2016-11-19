@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Sat Nov 19 10:47:34 2016 mstenber
-# Edit time:     327 min
+# Last modified: Sat Nov 19 11:12:40 2016 mstenber
+# Edit time:     333 min
 #
 """This is the 'forest layer' main module.
 
@@ -225,6 +225,10 @@ class LoadedTreeNode(DataMixin, btree.TreeNode):
             tn2.pickler.set_dict_to(cd, tn2)
             self._add_child(tn2, skip_dirty=True)
 
+    def search_name(self, name):
+        n = self.leaf_class(self._forest, name=name)
+        return self.search(n)
+
     def to_data(self):
         t = self.entry_type
         if self.is_leafy:
@@ -238,9 +242,9 @@ class NamedLeafNode(DataMixin, btree.LeafNode):
     _block_id = None
     _inode = None  # of the child that we represent
 
-    def __init__(self, forest):
+    def __init__(self, forest, **kw):
         self._forest = forest
-        btree.LeafNode.__init__(self)
+        btree.LeafNode.__init__(self, **kw)
 
     def perform_flush(self):
         if self._inode is not None:
@@ -287,7 +291,7 @@ class FileBlockEntry(NamedLeafNode):
 
 class FileBlockTreeNode(LoadedTreeNode):
     leaf_class = FileBlockEntry
-    entry_Type = const.TYPE_FILENODE
+    entry_type = const.TYPE_FILENODE
 
 
 class Forest:
