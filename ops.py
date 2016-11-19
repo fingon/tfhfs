@@ -9,23 +9,50 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Fri Aug 19 07:08:34 2016 mstenber
-# Edit time:     13 min
+# Last modified: Sat Nov 19 11:42:52 2016 mstenber
+# Edit time:     30 min
 #
 """
 
 This is llfuse Operations subclass that implements tfhfs core
 filesystem using the forest module and appropriate storage backend.
 
+This should implement methods in
+
+http://pythonhosted.org/llfuse/operations.html
+
+using this as bonus
+
+http://pythonhosted.org/llfuse/fuse_api.html
+
+ llfuse.invalidate_inode(inode, attr_only=False)
+ - forget cached attributes + data (if attr_only not set) for inode
+
+ llfuse.invalidate_entry(inode, name)
+
+ - invalidate dentry within directory within inode inode
+
+
+
 """
 
-from errno import ENOSYS
+from errno import EEXIST, ENOENT, ENOSYS, EPERM
 
 import llfuse
 
 
+def assert_or_errno(stmt, err):
+    if not stmt:
+        raise llfuse.FUSEError(err)
+
+
 class Operations(llfuse.Operations):
+
     _initialized = False
+
+    def __init__(self, forest):
+        self.forest = forest
+        llfuse.Operations.__init__(self)
 
     # Lifecycle functions
 
@@ -81,11 +108,23 @@ class Operations(llfuse.Operations):
 
     def lookup(self, parent_inode, name, ctx):
         assert self._initialized
+        n = self.forest.get_inode(parent_inode)
+        assert_or_errno(n, ENOENT)
+        # TBD: '.', '..'
+        cn = n.search_name(name)
+        assert_or_errno(cn, ENOENT)
+
         raise llfuse.FUSEError(ENOSYS)
 
     def mkdir(self, parent_inode, name, mode, ctx):
         assert self._initialized
-        raise llfuse.FUSEError(ENOSYS)
+        n = self.forest.get_inode(parent_inode)
+        assert_or_errno(n, ENOENT)
+        cn = n.search_name(name)
+        assert_or_errno(not cn and name not in [b'.', b'..'], EEXIST)
+        # TBD: access
+        self.forest.create_dir(n, name=name)
+        return self.lookup(parent_inode, name, ctx)
 
     def mknod(self, parent_inode, name, mode, rdev, ctx):
         assert self._initialized

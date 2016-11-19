@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Sat Nov 19 10:42:04 2016 mstenber
-# Edit time:     41 min
+# Last modified: Sat Nov 19 11:43:16 2016 mstenber
+# Edit time:     44 min
 #
 """
 
@@ -29,8 +29,10 @@ import unittest
 import ddt
 import pytest
 
+import forest
 import llfuse
 import ops
+from storage import NopBlockCodec, SQLiteStorage, TypedBlockCodec
 
 
 @ddt.ddt
@@ -55,8 +57,9 @@ class OpsTester(unittest.TestCase):
 
     def setUp(self):
         self.inodes = {b'.': llfuse.ROOT_INODE}
-
-        self.ops = ops.Operations()
+        storage = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
+        f = forest.Forest(storage, llfuse.ROOT_INODE)
+        self.ops = ops.Operations(f)
         self.rctx_root = llfuse.RequestContext()
         self.rctx_user = llfuse.RequestContext(uid=42, gid=7, pid=123)
         self.ops.init()
@@ -100,7 +103,6 @@ class OpsTester(unittest.TestCase):
         self._create(llfuse.ROOT_INODE, b'root_file', self.rctx_user)
 
     # destroy implicitly tested in tearDown
-
     @pytest.mark.xfail(raises=llfuse.FUSEError)
     def test_flush(self):
         # TBD - it should not have any real semantics?
