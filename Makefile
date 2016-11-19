@@ -6,8 +6,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Nov 19 10:48:22 2016 mstenber
-# Last modified: Sat Nov 19 10:49:32 2016 mstenber
-# Edit time:     1 min
+# Last modified: Sat Nov 19 12:01:23 2016 mstenber
+# Edit time:     4 min
 #
 #
 
@@ -31,6 +31,6 @@ clean:
 test: .done.requirements
 	py.test -n $(CORE_COUNT)
 
-.done.requirements:
-	pip3 install $(PIP_TO_USER) -r requirements.txt
+.done.requirements: requirements/*.txt
+	pip3 install --upgrade $(PIP_TO_USER) -c requirements/constraints.txt -r requirements/runtime.txt -r requirements/development.txt
 	touch $@

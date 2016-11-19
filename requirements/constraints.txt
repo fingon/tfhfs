@@ -1,0 +1,2 @@
+# 3.0+ has spurious(?) warnings for xdist
+pytest==2.9.2
