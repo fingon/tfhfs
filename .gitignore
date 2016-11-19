@@ -58,3 +58,6 @@ target/
 .coverage.*
 
 *~
+
+# Done
+.done.*
