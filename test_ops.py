@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Sat Nov 19 11:43:16 2016 mstenber
-# Edit time:     44 min
+# Last modified: Sat Nov 19 12:37:24 2016 mstenber
+# Edit time:     49 min
 #
 """
 
@@ -154,3 +154,15 @@ class OpsTester(unittest.TestCase):
             raise
         except llfuse.FUSEError as e:
             assert e.errno_ == errno.ENOATTR
+
+
+def test_ensure_full_implementation():
+    ignored_always = {'__dict__', '__weakref__'}
+    ignored_base = {'stacktrace',  # utility
+                    } | ignored_always
+    ignored_ours = {'x'} | ignored_always
+    vars1 = set(vars(llfuse.Operations).keys()).difference(ignored_base)
+    vars2 = set(vars(ops.Operations).keys()).difference(ignored_ours)
+    print(vars1, vars2)
+    assert vars1.difference(vars2) == set()
+    # assert vars2.difference(vars1) == set() # we don't care about extra

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Sat Nov 19 11:42:52 2016 mstenber
-# Edit time:     30 min
+# Last modified: Sat Nov 19 12:36:58 2016 mstenber
+# Edit time:     35 min
 #
 """
 
@@ -87,6 +87,10 @@ class Operations(llfuse.Operations):
         raise llfuse.FUSEError(ENOSYS)
 
     def fsync(self, fh, datasync):
+        assert self._initialized
+        raise llfuse.FUSEError(ENOSYS)
+
+    def fsyncdir(self, fh, datasync):
         assert self._initialized
         raise llfuse.FUSEError(ENOSYS)
 
