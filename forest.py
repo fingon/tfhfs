@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Fri Nov 25 16:58:50 2016 mstenber
-# Edit time:     469 min
+# Last modified: Fri Nov 25 17:05:33 2016 mstenber
+# Edit time:     472 min
 #
 """This is the 'forest layer' main module.
 
@@ -221,13 +221,17 @@ class Forest(inode.INodeStore):
     file_node_class = FileBlockTreeNode
 
     def __init__(self, storage, root_inode):
-        inode.INodeStore.__init__(self, first_free_inode=root_inode + 1)
+        self.root_inode = root_inode
         self.storage = storage
+        self.init()
+
+    def init(self):
+        inode.INodeStore.__init__(self, first_free_inode=self.root_inode + 1)
         self.dirty_node_set = set()
         block_id = self.storage.get_block_id_by_name(CONTENT_NAME)
         tn = self.load_dir_node_from_block(block_id)
         tn.load()
-        self.root = self.add_inode(tn, value=root_inode)
+        self.root = self.add_inode(tn, value=self.root_inode)
 
     def _add_child(self, tn, cn):
         assert tn.parent is None

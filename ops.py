@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Sat Nov 19 12:36:58 2016 mstenber
-# Edit time:     35 min
+# Last modified: Fri Nov 25 17:14:34 2016 mstenber
+# Edit time:     61 min
 #
 """
 
@@ -36,8 +36,9 @@ http://pythonhosted.org/llfuse/fuse_api.html
 
 """
 
-from errno import EEXIST, ENOENT, ENOSYS, EPERM
+from errno import EEXIST, ENOENT, ENOSYS
 
+import forest
 import llfuse
 
 
@@ -62,6 +63,12 @@ class Operations(llfuse.Operations):
 
     def destroy(self):
         assert self._initialized
+
+        # Store current state to disk, and then restart from scratch.
+        # Running forget-equivalents does not seem appealing.
+        self.forest.flush()
+        self.forest.init()
+
         del self._initialized
 
     # Normal client API
@@ -83,8 +90,7 @@ class Operations(llfuse.Operations):
         assert self._initialized
         for inode, nlookup in inode_list:
             # reduce reference count of 'inode' by 'nlookup'
-            pass
-        raise llfuse.FUSEError(ENOSYS)
+            self.forest.get_inode_by_value(inode).deref(nlookup)
 
     def fsync(self, fh, datasync):
         assert self._initialized
@@ -112,22 +118,38 @@ class Operations(llfuse.Operations):
 
     def lookup(self, parent_inode, name, ctx):
         assert self._initialized
-        n = self.forest.get_inode(parent_inode)
+        n = self.forest.getdefault_inode_by_value(parent_inode)
         assert_or_errno(n, ENOENT)
-        # TBD: '.', '..'
-        cn = n.search_name(name)
-        assert_or_errno(cn, ENOENT)
-
+        cn = n.parent_node
+        if name == b'.':
+            pass
+        elif name == b'..':
+            if cn:
+                gp_inode = self.forest.getdefault_inode_by_parent(cn.root)
+                if gp_inode:
+                    return self.lookup(gp_inode.value, b'.', ctx)
+                cn = None
+        else:
+            cn = n.node.search_name(name)
+            assert_or_errno(cn, ENOENT)
+        if cn is None:
+            # Root
+            # TBD
+            pass
+        else:
+            # non-root => LeafNode
+            assert isinstance(cn, forest.DirectoryEntry)
+            # TBD
         raise llfuse.FUSEError(ENOSYS)
 
     def mkdir(self, parent_inode, name, mode, ctx):
         assert self._initialized
-        n = self.forest.get_inode(parent_inode)
-        assert_or_errno(n, ENOENT)
-        cn = n.search_name(name)
-        assert_or_errno(not cn and name not in [b'.', b'..'], EEXIST)
+        inode = self.forest.getdefault_inode_by_value(parent_inode)
+        assert_or_errno(inode, ENOENT)
+        cn = inode.node.search_name(name)
+        assert_or_errno(not cn, EEXIST)
         # TBD: access
-        self.forest.create_dir(n, name=name)
+        self.forest.create_dir(inode, name=name)
         return self.lookup(parent_inode, name, ctx)
 
     def mknod(self, parent_inode, name, mode, rdev, ctx):

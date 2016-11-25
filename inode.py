@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Fri Nov 25 16:09:23 2016 mstenber
-# Edit time:     15 min
+# Last modified: Fri Nov 25 17:07:38 2016 mstenber
+# Edit time:     16 min
 #
 """
 
@@ -72,6 +72,9 @@ class INodeStore:
     def get_inode_by_value(self, value):
         return self._value2inode[value]
 
+    def getdefault_inode_by_value(self, value, default=None):
+        return self._value2inode.get(value, default)
+
     def _register_inode(self, inode):
         self._value2inode[inode.value] = inode
         self._node2inode[inode.node] = inode
@@ -110,17 +113,19 @@ class INode:
         if parent_node:
             self.store.get_inode_by_node(parent_node.root).ref()
 
-    def deref(self):
-        if self.refcnt == 1:
+    def deref(self, count=1):
+        assert count > 0
+        if self.refcnt == count:
             self.store.inodes_waiting_to_remove.add(self)
-        self.refcnt -= 1
+        self.refcnt -= count
         assert self.refcnt >= 0
 
-    def ref(self):
+    def ref(self, count=1):
+        assert count > 0
         assert self.refcnt >= 0
         if self.refcnt == 0:
             self.store.inodes_waiting_to_remove.remove(self)
-        self.refcnt += 1
+        self.refcnt += count
 
     def remove(self):
         assert self.refcnt == 0
