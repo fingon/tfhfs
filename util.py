@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:06:01 2016 mstenber
-# Last modified: Fri Nov 25 15:07:16 2016 mstenber
-# Edit time:     1 min
+# Last modified: Fri Nov 25 18:04:40 2016 mstenber
+# Edit time:     4 min
 #
 """
 
@@ -55,9 +55,11 @@ class DirtyMixin:
     """
 
     dirty = False
+    parent = None
 
     def mark_dirty(self):
         if self.dirty:
+            _debug('%s already dirty', self)
             return
         _debug('marked dirty: %s', self)
         self.dirty = True
@@ -65,7 +67,8 @@ class DirtyMixin:
         return True
 
     def mark_dirty_related(self):
-        raise NotImplementedError
+        if self.parent:
+            self.parent.mark_dirty()
 
     def flush(self):
         if not self.dirty:
@@ -87,24 +90,19 @@ class DataMixin(DirtyMixin):
 
     _data = None
 
-    parent = None
-
     @property
     def data(self):
         if self._data is None:
             self._data = {}
         return self._data
 
-    def mark_dirty_related(self):
-        if self.parent:
-            self.parent.mark_dirty()
-
     def set_data(self, k, v):
-        if self._data == None:
-            self._data = {}
-        if self._data.get(k) is not v:
-            self._data[k] = v
-            self.mark_dirty()
+        data = self.data
+        if data.get(k) == v:
+            _debug('%s redundant set_data %s=%s', self, k, v)
+            return
+        data[k] = v
+        self.mark_dirty()
 
 
 class CBORPickler:

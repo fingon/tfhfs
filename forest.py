@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Fri Nov 25 17:05:33 2016 mstenber
-# Edit time:     472 min
+# Last modified: Fri Nov 25 18:00:23 2016 mstenber
+# Edit time:     473 min
 #
 """This is the 'forest layer' main module.
 
@@ -43,23 +43,23 @@ import logging
 import btree
 import const
 import inode
-from util import CBORPickler, DataMixin, sha256
+from util import CBORPickler, DataMixin, DirtyMixin, sha256
 
 _debug = logging.getLogger(__name__).debug
 
 
-class LoadedTreeNode(DataMixin, btree.TreeNode):
+class LoadedTreeNode(DirtyMixin, btree.TreeNode):
 
     # 'pickler' is used to en/decode references to this object within
     # other nodes closer to the root of the tree.
-    pickler = CBORPickler(dict(key=1, _block_id=2, _data=3))
+    pickler = CBORPickler(dict(key=1, _block_id=2))
 
     # 'content_pickler' is used to en/decode content of this object.
     # type is not within, as it is part of 'storage' (as it has also
     # compressed bit). pickled_child_list contains references handled
     # via 'pickler'.
     content_pickler = CBORPickler(
-        dict(key=17, _data=18, pickled_child_list=19))
+        dict(key=17, pickled_child_list=18))
 
     _loaded = False
 

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Jul  5 11:49:58 2016 mstenber
-# Last modified: Fri Nov 25 16:59:19 2016 mstenber
-# Edit time:     47 min
+# Last modified: Fri Nov 25 18:04:58 2016 mstenber
+# Edit time:     51 min
 #
 """
 
@@ -40,25 +40,11 @@ def test_forest():
     root2 = f.root
     assert root is root2
 
-    rootn = root.node
-    assert not rootn.dirty
-    rootn.set_data('test', 42)
-    assert rootn.dirty
-    assert rootn.data == dict(test=42)
-    assert f.flush()
-    assert not f.flush()
-
-    _debug('ensuring secondary database gets same result')
-
-    storage2 = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
-    storage2.conn = storage.conn
-    f2 = forest.Forest(storage, 42)
-    assert not f2.root.node.dirty
-    assert f2.root.node.data == dict(test=42)
-
     # add a 'file'
     file_inode = f.create_file(f.root, b'foo')
     file_parent = file_inode.parent_node
+    assert f.flush()
+    file_parent.set_data('foo', 42)
     assert f.flush()
     assert not f.flush()
 
@@ -68,7 +54,7 @@ def test_forest():
     storage2.conn = storage.conn
     f2 = forest.Forest(storage, 42)
     assert not f2.root.node.dirty
-    assert f2.root.node.search(file_parent).key == file_parent.key
+    assert f2.root.node.search(file_parent).data == dict(foo=42)
     assert not f2.root.node.dirty
 
     # add a directory
