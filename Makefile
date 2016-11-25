@@ -6,8 +6,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Nov 19 10:48:22 2016 mstenber
-# Last modified: Sat Nov 19 12:01:23 2016 mstenber
-# Edit time:     4 min
+# Last modified: Fri Nov 25 18:11:04 2016 mstenber
+# Edit time:     9 min
 #
 #
 
@@ -28,8 +28,12 @@ all: test
 clean:
 	rm -f .done.*
 
+# -rx = extra detail about xfails
+# -rw = extra detail about pytest warnings
+# --strict = mark as fail if xfail succeeds
+
 test: .done.requirements
-	py.test -n $(CORE_COUNT)
+	py.test --strict -rx -rw -n $(CORE_COUNT)
 
 .done.requirements: requirements/*.txt
 	pip3 install --upgrade $(PIP_TO_USER) -c requirements/constraints.txt -r requirements/runtime.txt -r requirements/development.txt
