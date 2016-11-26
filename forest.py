@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Fri Nov 25 18:00:23 2016 mstenber
-# Edit time:     473 min
+# Last modified: Sat Nov 26 10:50:22 2016 mstenber
+# Edit time:     489 min
 #
 """This is the 'forest layer' main module.
 
@@ -59,7 +59,7 @@ class LoadedTreeNode(DirtyMixin, btree.TreeNode):
     # compressed bit). pickled_child_list contains references handled
     # via 'pickler'.
     content_pickler = CBORPickler(
-        dict(key=17, pickled_child_list=18))
+        dict(key=0x11, pickled_child_list=0x12))
 
     _loaded = False
 
@@ -159,7 +159,11 @@ class LoadedTreeNode(DirtyMixin, btree.TreeNode):
 
 
 class NamedLeafNode(DataMixin, btree.LeafNode):
-    pickler = CBORPickler(dict(name=33, _block_id=34, _data=35))
+    pickler = CBORPickler(dict(name=0x21, _block_id=0x22, _cbor_data=0x23))
+
+    # Used to pickle _data
+    cbor_data_pickler = CBORPickler(dict(is_dir=0x31, foo=0x42))
+    # 'foo' is used in tests only, as random metadata
 
     _block_id = None
 
@@ -257,6 +261,7 @@ class Forest(inode.INodeStore):
         inode = self.add_inode(node=node, parent_node=leaf)
 
         # New = dirty
+        leaf.set_data('is_dir', is_directory)
         node.mark_dirty()
         return inode
 
@@ -291,6 +296,22 @@ class Forest(inode.INodeStore):
         self.remove_old_inodes()
 
         return rv
+
+    def lookup(self, dir_inode, name):
+        assert isinstance(dir_inode, inode.INode)
+        assert isinstance(name, bytes)
+        n = dir_inode.node.search_name(name)
+        if n:
+            child_inode = self.getdefault_inode_by_node(n)
+            if child_inode is None:
+                if n.data['is_dir']:
+                    cn = self.load_dir_node_from_block(n._block_id)
+                else:
+                    cn = self.load_file_node_from_block(n._block_id)
+                child_inode = self.add_inode(cn, parent_node=n)
+            else:
+                child_inode.ref()
+            return child_inode
 
     def _load_node_from_block(self, is_dir, block_id):
         cl = is_dir and self.directory_node_class or self.file_node_class

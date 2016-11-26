@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Fri Nov 25 17:07:38 2016 mstenber
+# Last modified: Sat Nov 26 10:50:00 2016 mstenber
 # Edit time:     16 min
 #
 """
@@ -71,6 +71,9 @@ class INodeStore:
 
     def get_inode_by_value(self, value):
         return self._value2inode[value]
+
+    def getdefault_inode_by_node(self, node, default=None):
+        return self._node2inode.get(node, default)
 
     def getdefault_inode_by_value(self, value, default=None):
         return self._value2inode.get(value, default)

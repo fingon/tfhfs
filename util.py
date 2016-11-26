@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:06:01 2016 mstenber
-# Last modified: Fri Nov 25 18:04:40 2016 mstenber
-# Edit time:     4 min
+# Last modified: Sat Nov 26 10:45:15 2016 mstenber
+# Edit time:     12 min
 #
 """
 
@@ -97,12 +97,25 @@ class DataMixin(DirtyMixin):
         return self._data
 
     def set_data(self, k, v):
+        assert (not self.cbor_data_pickler
+                or k in self.cbor_data_pickler.internal2external_dict)
         data = self.data
         if data.get(k) == v:
             _debug('%s redundant set_data %s=%s', self, k, v)
             return
         data[k] = v
         self.mark_dirty()
+
+    cbor_data_pickler = None
+
+    @property
+    def _cbor_data(self):
+        return self.cbor_data_pickler.get_external_dict_from_internal_dict(self.data)
+
+    @_cbor_data.setter
+    def _cbor_data(self, value):
+        d = self.cbor_data_pickler.get_internal_dict_from_external_dict(value)
+        self._data = d
 
 
 class CBORPickler:
@@ -132,9 +145,16 @@ class CBORPickler:
         return cbor.dumps(self.get_external_dict(o))
 
     def get_external_dict(self, o):
-        d = {self.internal2external_dict[k]: getattr(o, k)
-             for k in self.internal2external_dict.keys()}
-        return d
+        return {self.internal2external_dict[k]: getattr(o, k)
+                for k in self.internal2external_dict.keys()}
+
+    def get_external_dict_from_internal_dict(self, d):
+        return {self.internal2external_dict[k]: d.get(k)
+                for k in self.internal2external_dict.keys()}
+
+    def get_internal_dict_from_external_dict(self, d):
+        return {self.external2internal_dict[k]: d.get(k)
+                for k in self.external2internal_dict.keys()}
 
     def load_external_dict_to(self, d, o):
         self.set_external_dict_to(cbor.loads(d), o)

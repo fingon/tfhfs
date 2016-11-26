@@ -2,6 +2,8 @@
 
 * Pending (short-term)
 
+** Consider if CBORPickler should also support e.g. IntEnum as argument
+
 ** Add TYPE_FILENODE / TYPE_FILEDATA handling as well to forest module
 
 TYPE_FILENODEs will represent large files (contains subtree of nodes with

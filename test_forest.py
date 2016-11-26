@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Jul  5 11:49:58 2016 mstenber
-# Last modified: Fri Nov 25 18:04:58 2016 mstenber
-# Edit time:     51 min
+# Last modified: Sat Nov 26 10:48:29 2016 mstenber
+# Edit time:     56 min
 #
 """
 
@@ -54,7 +54,8 @@ def test_forest():
     storage2.conn = storage.conn
     f2 = forest.Forest(storage, 42)
     assert not f2.root.node.dirty
-    assert f2.root.node.search(file_parent).data == dict(foo=42)
+    f2c = f2.lookup(f2.root, b'foo')
+    assert f2c and f2c.parent_node.data == dict(foo=42, is_dir=False)
     assert not f2.root.node.dirty
 
     # add a directory
@@ -68,7 +69,7 @@ def test_forest():
 
     # Ensure that changing things _within the directory_ also makes
     # things happen.
-    subdir.set_data('x', 43)
+    subdir.set_data('foo', 43)
     assert subdir.dirty
     # assert f.root.dirty # n/a; the dirtiness is propagated during flush
 
@@ -90,4 +91,5 @@ def test_larger_forest():
     storage2 = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
     storage2.conn = storage.conn
     f2 = forest.Forest(storage, 7)
-    assert f2.root.node.search(inode.parent_node).key == inode.parent_node.key
+    pn = inode.parent_node
+    assert f2.lookup(f2.root, pn.name).parent_node.key == pn.key
