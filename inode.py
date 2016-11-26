@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Sat Nov 26 10:50:00 2016 mstenber
-# Edit time:     16 min
+# Last modified: Sat Nov 26 11:03:41 2016 mstenber
+# Edit time:     20 min
 #
 """
 
@@ -115,6 +115,10 @@ class INode:
         # Add reference to the parent inode; we do not want children dangling
         if parent_node:
             self.store.get_inode_by_node(parent_node.root).ref()
+        _debug('%s added', self)
+
+    def __repr__(self):
+        return '<INode #%d - n:%s pn:%s>' % (self.value, self.node, self.parent_node)
 
     def deref(self, count=1):
         assert count > 0
@@ -142,8 +146,8 @@ class INode:
         assert isinstance(node, TreeNode)
         if self.node is node:
             return
-        _debug('replacing %s node %s -> %s' % (self, self.node, node))
-        del self.store._node2inode[self.node]
+        _debug('%s replacing node -> %s' % (self, node))
         assert node not in self.store._node2inode
+        del self.store._node2inode[self.node]
         self.node = node
         self.store._node2inode[self.node] = self
