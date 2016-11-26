@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Sat Nov 26 11:03:41 2016 mstenber
-# Edit time:     20 min
+# Last modified: Sat Nov 26 11:23:51 2016 mstenber
+# Edit time:     21 min
 #
 """
 
@@ -75,6 +75,9 @@ class INodeStore:
     def getdefault_inode_by_node(self, node, default=None):
         return self._node2inode.get(node, default)
 
+    def getdefault_inode_by_parent_node(self, parent_node, default=None):
+        return self._pnode2inode.get(parent_node, default)
+
     def getdefault_inode_by_value(self, value, default=None):
         return self._value2inode.get(value, default)
 
@@ -126,6 +129,7 @@ class INode:
             self.store.inodes_waiting_to_remove.add(self)
         self.refcnt -= count
         assert self.refcnt >= 0
+        return self
 
     def ref(self, count=1):
         assert count > 0
@@ -133,6 +137,7 @@ class INode:
         if self.refcnt == 0:
             self.store.inodes_waiting_to_remove.remove(self)
         self.refcnt += count
+        return self
 
     def remove(self):
         assert self.refcnt == 0

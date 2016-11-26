@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Jul  5 11:49:58 2016 mstenber
-# Last modified: Sat Nov 26 11:07:07 2016 mstenber
-# Edit time:     61 min
+# Last modified: Sat Nov 26 11:25:33 2016 mstenber
+# Edit time:     66 min
 #
 """
 
@@ -56,6 +56,8 @@ def test_forest():
     assert not f2.root.node.dirty
     assert f2.lookup(f2.root, b'nonexistent') is None
     f2c = f2.lookup(f2.root, b'foo')
+    f2c2 = f2.lookup(f2.root, b'foo')
+    assert f2c is f2c2
     assert f2c and f2c.parent_node.data == dict(foo=42, is_dir=False)
     assert not f2.root.node.dirty
 
@@ -102,16 +104,18 @@ def test_deep_forest():
     assert parent_inode.parent_node.data['foo'] == 42
 
 
-def test_larger_forest():
+def test_wide_forest():
     storage = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
     f = forest.Forest(storage, 42)
     f.directory_node_class = LeafierDirectoryTreeNode
-    for i in range(100):
+    test_count = 100
+    for i in range(test_count):
         inode = f.create_dir(f.root, name=b'foo%d' % i)
     f.flush()
 
     storage2 = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
     storage2.conn = storage.conn
     f2 = forest.Forest(storage, 7)
-    pn = inode.parent_node
-    assert f2.lookup(f2.root, pn.name).parent_node.key == pn.key
+    for i in range(test_count):
+        inode = f2.lookup(f2.root, b'foo%d' % i)
+        assert inode

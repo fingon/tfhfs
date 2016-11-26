@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Sat Nov 26 10:50:22 2016 mstenber
-# Edit time:     489 min
+# Last modified: Sat Nov 26 11:21:48 2016 mstenber
+# Edit time:     496 min
 #
 """This is the 'forest layer' main module.
 
@@ -238,15 +238,8 @@ class Forest(inode.INodeStore):
         self.root = self.add_inode(tn, value=self.root_inode)
 
     def _add_child(self, tn, cn):
-        assert tn.parent is None
-        ntn = tn.add(cn)
-        if not ntn or ntn == tn:
-            return
-        _debug('root changed for %s to %s', tn, ntn)
-        inode = self.get_inode_by_node(tn)
-        assert inode
-        inode.set_node(ntn)
-        return ntn
+        assert not tn.parent
+        self.get_inode_by_node(tn).set_node(tn.add(cn))
 
     def _create(self, is_directory, dir_inode, name):
         # Create 'content tree' root node
@@ -302,7 +295,7 @@ class Forest(inode.INodeStore):
         assert isinstance(name, bytes)
         n = dir_inode.node.search_name(name)
         if n:
-            child_inode = self.getdefault_inode_by_node(n)
+            child_inode = self.getdefault_inode_by_parent_node(n)
             if child_inode is None:
                 if n.data['is_dir']:
                     cn = self.load_dir_node_from_block(n._block_id)
