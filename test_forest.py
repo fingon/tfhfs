@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Jul  5 11:49:58 2016 mstenber
-# Last modified: Sat Nov 26 10:48:29 2016 mstenber
-# Edit time:     56 min
+# Last modified: Sat Nov 26 11:07:07 2016 mstenber
+# Edit time:     61 min
 #
 """
 
@@ -54,6 +54,7 @@ def test_forest():
     storage2.conn = storage.conn
     f2 = forest.Forest(storage, 42)
     assert not f2.root.node.dirty
+    assert f2.lookup(f2.root, b'nonexistent') is None
     f2c = f2.lookup(f2.root, b'foo')
     assert f2c and f2c.parent_node.data == dict(foo=42, is_dir=False)
     assert not f2.root.node.dirty
@@ -78,6 +79,27 @@ def test_forest():
     assert f.flush()
     assert root.node._block_id != old_root_block_id
     assert not f.flush()
+
+
+def test_deep_forest():
+    storage = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
+    f = forest.Forest(storage, 42)
+    parent_inode = f.root
+    test_depth = 10
+    for i in range(test_depth):
+        parent_inode = f.create_dir(parent_inode, b'dir')
+        assert parent_inode
+    parent_inode.parent_node.set_data('foo', 42)
+    f.flush()
+
+    storage2 = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
+    storage2.conn = storage.conn
+    f2 = forest.Forest(storage, 42)
+    parent_inode = f2.root
+    for i in range(test_depth):
+        _debug('iteration #%d/%d', i + 1, test_depth)
+        parent_inode = f2.lookup(parent_inode, b'dir')
+    assert parent_inode.parent_node.data['foo'] == 42
 
 
 def test_larger_forest():
