@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Sat Nov 26 11:23:51 2016 mstenber
-# Edit time:     21 min
+# Last modified: Fri Dec  2 17:02:54 2016 mstenber
+# Edit time:     24 min
 #
 """
 
@@ -49,8 +49,7 @@ class INodeStore:
         self.inodes_waiting_to_remove = set()
 
     def add_inode(self, node, *, parent_node=None, value=None):
-        assert isinstance(node, TreeNode)
-        assert not parent_node or isinstance(parent_node, LeafNode)
+        assert parent_node is None or isinstance(parent_node, LeafNode)
         if value is None:
             value = self.first_free_inode
             self.first_free_inode += 1
@@ -83,7 +82,9 @@ class INodeStore:
 
     def _register_inode(self, inode):
         self._value2inode[inode.value] = inode
-        self._node2inode[inode.node] = inode
+        n = inode.node
+        if n:
+            self._node2inode[inode.node] = inode
         p = inode.parent_node
         if p:
             self._pnode2inode[p] = inode
@@ -100,7 +101,9 @@ class INodeStore:
 
     def _unregister_inode(self, inode):
         del self._value2inode[inode.value]
-        del self._node2inode[inode.node]
+        n = inode.node
+        if n:
+            del self._node2inode[n]
         p = inode.parent_node
         if p:
             del self._pnode2inode[p]

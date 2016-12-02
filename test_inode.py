@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:45:43 2016 mstenber
-# Last modified: Fri Nov 25 16:09:58 2016 mstenber
-# Edit time:     7 min
+# Last modified: Fri Dec  2 17:01:08 2016 mstenber
+# Edit time:     9 min
 #
 """
 
@@ -40,6 +40,15 @@ def test():
     assert not s.remove_old_inodes()
     child_inode.deref()
     assert child_inode.refcnt == 0
+    assert s.remove_old_inodes() == 1
+    assert s.count() == 1
+
+    # Test that 'None' inodes also work (=very leafy inodes)
+    ln2 = LeafNode(b'bar')
+    root_n.add_child(ln2)
+    child_inode2 = s.add_inode(node=None, parent_node=ln2)
+    assert root_inode.refcnt == 2
+    child_inode2.deref()
     assert s.remove_old_inodes() == 1
     assert s.count() == 1
 
