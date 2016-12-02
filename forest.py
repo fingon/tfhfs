@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Sat Nov 26 11:21:48 2016 mstenber
-# Edit time:     496 min
+# Last modified: Fri Dec  2 17:37:34 2016 mstenber
+# Edit time:     510 min
 #
 """This is the 'forest layer' main module.
 
@@ -159,13 +159,17 @@ class LoadedTreeNode(DirtyMixin, btree.TreeNode):
 
 
 class NamedLeafNode(DataMixin, btree.LeafNode):
-    pickler = CBORPickler(dict(name=0x21, _block_id=0x22, _cbor_data=0x23))
+    pickler = CBORPickler(dict(name=0x21,
+                               _block_id=0x22,  # tree / data node
+                               block_data=0x23,  # raw data without subtree
+                               _cbor_data=0x24))
 
     # Used to pickle _data
-    cbor_data_pickler = CBORPickler(dict(is_dir=0x31, foo=0x42))
+    cbor_data_pickler = CBORPickler(dict(mode=0x31, foo=0x42))
     # 'foo' is used in tests only, as random metadata
 
     _block_id = None
+    block_data = None
 
     def __init__(self, forest, **kw):
         self._forest = forest
@@ -183,10 +187,11 @@ class NamedLeafNode(DataMixin, btree.LeafNode):
     def set_block_id(self, block_id):
         if self._block_id == block_id:
             return
+        if block_id:
+            self._forest.storage.refer_block(block_id)
         if self._block_id:
             self._forest.storage.release_block(self._block_id)
         self._block_id = block_id
-        self._forest.storage.refer_block(block_id)
 
 
 class DirectoryEntry(NamedLeafNode):
@@ -237,32 +242,31 @@ class Forest(inode.INodeStore):
         tn.load()
         self.root = self.add_inode(tn, value=self.root_inode)
 
-    def _add_child(self, tn, cn):
-        assert not tn.parent
-        self.get_inode_by_node(tn).set_node(tn.add(cn))
-
-    def _create(self, is_directory, dir_inode, name):
-        # Create 'content tree' root node
+    def _create(self, mode, dir_inode, name):
+        # Create 'content tree' root node for the new child
+        is_directory = mode & const.DENTRY_MODE_DIR
         cl = is_directory and self.directory_node_class or self.file_node_class
         node = cl(self)
         node._loaded = True
 
-        # Create leaf node for the tree 'tn'
         leaf = dir_inode.node.leaf_class(self, name=name)
-        self._add_child(dir_inode.node, leaf)
 
+        # Create leaf node for the tree 'rn'
+        rn = dir_inode.node
+        assert not rn.parent
+        self.get_inode_by_node(rn).set_node(rn.add(leaf))
         inode = self.add_inode(node=node, parent_node=leaf)
 
         # New = dirty
-        leaf.set_data('is_dir', is_directory)
+        leaf.set_data('mode', is_directory)
         node.mark_dirty()
         return inode
 
     def create_dir(self, dir_inode, name):
-        return self._create(True, dir_inode, name)
+        return self._create(const.DENTRY_MODE_DIR, dir_inode, name)
 
     def create_file(self, dir_inode, name):
-        return self._create(False, dir_inode, name)
+        return self._create(0, dir_inode, name)
 
     def flush(self):
         _debug('flush')
@@ -297,7 +301,7 @@ class Forest(inode.INodeStore):
         if n:
             child_inode = self.getdefault_inode_by_parent_node(n)
             if child_inode is None:
-                if n.data['is_dir']:
+                if n.data['mode'] & const.DENTRY_MODE_DIR:
                     cn = self.load_dir_node_from_block(n._block_id)
                 else:
                     cn = self.load_file_node_from_block(n._block_id)

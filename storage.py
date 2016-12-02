@@ -9,12 +9,12 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Tue Jul  5 12:23:28 2016 mstenber
-# Edit time:     262 min
+# Last modified: Tue Nov 29 18:53:16 2016 mstenber
+# Edit time:     264 min
 #
 """This is the 'storage layer' main module.
 
-It is provides abstract interface for the forest layer to use, and
+It provides an abstract interface for the forest layer to use, and
 uses storage backend for actual raw file operations.
 
 TBD: how to handle maximum_cache_size related flushes? trigger timer

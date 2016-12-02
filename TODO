@@ -2,6 +2,22 @@
 
 * Pending (short-term)
 
+** Implement files sensibly
+
+This will allow us to skip _lots_ of intermediate _files_ so it is
+important, while we are opting more on the side of correctness than
+efficiency.
+
+Options for a file:
+
+- block_data = upto N bytes stored in-place (I am tempted to keep this at
+  smallish values, e.g. 100 bytes)
+
+- single-block file = just one data block, no tree of blocks; up to maximum
+  size of block (100k-ish?)
+
+- tree of data blocks
+
 ** Consider if CBORPickler should also support e.g. IntEnum as argument
 
 ** Add TYPE_FILENODE / TYPE_FILEDATA handling as well to forest module
@@ -9,8 +25,6 @@
 TYPE_FILENODEs will represent large files (contains subtree of nodes with
 blocks), and individual TYPE_FILEDATA represents small (= single
 block-sized) files.
-
-** Add reference counting to forest module
 
 ** Add missing functionality to forest module (e.g. remove API?)
 
