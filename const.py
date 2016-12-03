@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jul  2 21:10:04 2016 mstenber
-# Last modified: Fri Dec  2 17:36:50 2016 mstenber
-# Edit time:     5 min
+# Last modified: Sat Dec  3 17:33:40 2016 mstenber
+# Edit time:     6 min
 #
 """
 
@@ -37,3 +37,4 @@ BIT_LEAFY = 0x40  # children are leaves of base type
 BIT_COMPRESSED = 0x80  # compression was applied to the block
 
 DENTRY_MODE_DIR = 0o1000
+DENTRY_MODE_MINIFILE = 0o2000  # single data block; no underlying tree

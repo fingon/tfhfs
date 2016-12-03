@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Fri Nov 25 17:14:34 2016 mstenber
-# Edit time:     61 min
+# Last modified: Sat Dec  3 17:48:54 2016 mstenber
+# Edit time:     62 min
 #
 """
 
@@ -38,7 +38,7 @@ http://pythonhosted.org/llfuse/fuse_api.html
 
 from errno import EEXIST, ENOENT, ENOSYS
 
-import forest
+import forest_nodes
 import llfuse
 
 
@@ -138,7 +138,7 @@ class Operations(llfuse.Operations):
             pass
         else:
             # non-root => LeafNode
-            assert isinstance(cn, forest.DirectoryEntry)
+            assert isinstance(cn, forest_nodes.DirectoryEntry)
             # TBD
         raise llfuse.FUSEError(ENOSYS)
 
