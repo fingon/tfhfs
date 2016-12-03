@@ -42,7 +42,7 @@ def test_forest():
 
     # add a 'file'
     file_inode = f.create_file(f.root, b'foo')
-    file_parent = file_inode.parent_node
+    file_parent = file_inode.leaf_node
     assert f.flush()
     file_parent.set_data('foo', 42)
     assert f.flush()
@@ -58,12 +58,12 @@ def test_forest():
     f2c = f2.lookup(f2.root, b'foo')
     f2c2 = f2.lookup(f2.root, b'foo')
     assert f2c is f2c2
-    assert f2c and f2c.parent_node.data == dict(foo=42, mode=0)
+    assert f2c and f2c.leaf_node.data == dict(foo=42, mode=0)
     assert not f2.root.node.dirty
 
     # add a directory
     dir_inode = f.create_dir(f.root, name=b'bar')
-    subdir = dir_inode.parent_node
+    subdir = dir_inode.leaf_node
     assert f.root.node.dirty
     assert not dir_inode.node._block_id
     f.flush()
@@ -91,7 +91,7 @@ def test_deep_forest():
     for i in range(test_depth):
         parent_inode = f.create_dir(parent_inode, b'dir')
         assert parent_inode
-    parent_inode.parent_node.set_data('foo', 42)
+    parent_inode.leaf_node.set_data('foo', 42)
     f.flush()
 
     storage2 = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
@@ -101,7 +101,7 @@ def test_deep_forest():
     for i in range(test_depth):
         _debug('iteration #%d/%d', i + 1, test_depth)
         parent_inode = f2.lookup(parent_inode, b'dir')
-    assert parent_inode.parent_node.data['foo'] == 42
+    assert parent_inode.leaf_node.data['foo'] == 42
 
 
 def test_wide_forest():

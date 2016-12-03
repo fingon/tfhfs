@@ -33,8 +33,8 @@ def test():
     root_n.add_child(ln1)
     child_n = TreeNode()
     assert root_inode.refcnt == 1
-    child_inode = s.add_inode(node=child_n, parent_node=ln1)
-    assert s.get_inode_by_parent_node(ln1) is child_inode
+    child_inode = s.add_inode(node=child_n, leaf_node=ln1)
+    assert s.get_inode_by_leaf_node(ln1) is child_inode
     assert root_inode.refcnt == 2
     assert child_inode.value == 13
     assert not s.remove_old_inodes()
@@ -46,7 +46,7 @@ def test():
     # Test that 'None' inodes also work (=very leafy inodes)
     ln2 = LeafNode(b'bar')
     root_n.add_child(ln2)
-    child_inode2 = s.add_inode(node=None, parent_node=ln2)
+    child_inode2 = s.add_inode(node=None, leaf_node=ln2)
     assert root_inode.refcnt == 2
     child_inode2.deref()
     assert s.remove_old_inodes() == 1

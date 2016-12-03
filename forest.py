@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Fri Dec  2 17:37:34 2016 mstenber
-# Edit time:     510 min
+# Last modified: Sat Dec  3 17:25:04 2016 mstenber
+# Edit time:     514 min
 #
 """This is the 'forest layer' main module.
 
@@ -176,12 +176,15 @@ class NamedLeafNode(DataMixin, btree.LeafNode):
         btree.LeafNode.__init__(self, **kw)
 
     def perform_flush(self):
-        inode = self._forest.get_inode_by_parent_node(self)
+        inode = self._forest.get_inode_by_leaf_node(self)
         if inode:
             c = inode.node
-            c.flush()
-            assert c._block_id
-            self.set_block_id(c._block_id)
+            if c:
+                c.flush()
+                assert c._block_id
+                self.set_block_id(c._block_id)
+            else:
+                self.set_block_id(None)
         return True
 
     def set_block_id(self, block_id):
@@ -245,9 +248,12 @@ class Forest(inode.INodeStore):
     def _create(self, mode, dir_inode, name):
         # Create 'content tree' root node for the new child
         is_directory = mode & const.DENTRY_MODE_DIR
-        cl = is_directory and self.directory_node_class or self.file_node_class
-        node = cl(self)
-        node._loaded = True
+        if is_directory:
+            cl = self.directory_node_class
+            node = cl(self)
+            node._loaded = True
+        else:
+            node = None
 
         leaf = dir_inode.node.leaf_class(self, name=name)
 
@@ -255,11 +261,14 @@ class Forest(inode.INodeStore):
         rn = dir_inode.node
         assert not rn.parent
         self.get_inode_by_node(rn).set_node(rn.add(leaf))
-        inode = self.add_inode(node=node, parent_node=leaf)
+        inode = self.add_inode(node=node, leaf_node=leaf)
 
         # New = dirty
         leaf.set_data('mode', is_directory)
-        node.mark_dirty()
+        if node:
+            node.mark_dirty()
+        else:
+            leaf.mark_dirty()
         return inode
 
     def create_dir(self, dir_inode, name):
@@ -276,8 +285,8 @@ class Forest(inode.INodeStore):
             self.dirty_node_set, dns = set(), self.dirty_node_set
             for node in dns:
                 inode = self.get_inode_by_node(node.root)
-                if inode.parent_node:
-                    inode.parent_node.mark_dirty()
+                if inode.leaf_node:
+                    inode.leaf_node.mark_dirty()
 
         # Then we call the root node's flush method, which
         # - propagates the calls back down the tree, updates block ids, and
@@ -299,13 +308,13 @@ class Forest(inode.INodeStore):
         assert isinstance(name, bytes)
         n = dir_inode.node.search_name(name)
         if n:
-            child_inode = self.getdefault_inode_by_parent_node(n)
+            child_inode = self.getdefault_inode_by_leaf_node(n)
             if child_inode is None:
                 if n.data['mode'] & const.DENTRY_MODE_DIR:
                     cn = self.load_dir_node_from_block(n._block_id)
                 else:
                     cn = self.load_file_node_from_block(n._block_id)
-                child_inode = self.add_inode(cn, parent_node=n)
+                child_inode = self.add_inode(cn, leaf_node=n)
             else:
                 child_inode.ref()
             return child_inode

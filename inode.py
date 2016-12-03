@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Fri Dec  2 17:02:54 2016 mstenber
+# Last modified: Sat Dec  3 17:26:37 2016 mstenber
 # Edit time:     24 min
 #
 """
@@ -44,16 +44,16 @@ class INodeStore:
     def __init__(self, first_free_inode):
         self._value2inode = {}
         self._node2inode = {}
-        self._pnode2inode = {}
+        self._lnode2inode = {}
         self.first_free_inode = first_free_inode
         self.inodes_waiting_to_remove = set()
 
-    def add_inode(self, node, *, parent_node=None, value=None):
-        assert parent_node is None or isinstance(parent_node, LeafNode)
+    def add_inode(self, node, *, leaf_node=None, value=None):
+        assert leaf_node is None or isinstance(leaf_node, LeafNode)
         if value is None:
             value = self.first_free_inode
             self.first_free_inode += 1
-        inode = INode(self, node, parent_node, value)
+        inode = INode(self, node, leaf_node, value)
         self._register_inode(inode)
         return inode
 
@@ -64,9 +64,9 @@ class INodeStore:
         assert isinstance(node, TreeNode)
         return self._node2inode[node]
 
-    def get_inode_by_parent_node(self, parent_node):
-        assert isinstance(parent_node, LeafNode)
-        return self._pnode2inode[parent_node]
+    def get_inode_by_leaf_node(self, leaf_node):
+        assert isinstance(leaf_node, LeafNode)
+        return self._lnode2inode[leaf_node]
 
     def get_inode_by_value(self, value):
         return self._value2inode[value]
@@ -74,8 +74,8 @@ class INodeStore:
     def getdefault_inode_by_node(self, node, default=None):
         return self._node2inode.get(node, default)
 
-    def getdefault_inode_by_parent_node(self, parent_node, default=None):
-        return self._pnode2inode.get(parent_node, default)
+    def getdefault_inode_by_leaf_node(self, leaf_node, default=None):
+        return self._lnode2inode.get(leaf_node, default)
 
     def getdefault_inode_by_value(self, value, default=None):
         return self._value2inode.get(value, default)
@@ -85,9 +85,9 @@ class INodeStore:
         n = inode.node
         if n:
             self._node2inode[inode.node] = inode
-        p = inode.parent_node
+        p = inode.leaf_node
         if p:
-            self._pnode2inode[p] = inode
+            self._lnode2inode[p] = inode
 
     def remove_old_inodes(self):
         cnt = 0
@@ -104,27 +104,27 @@ class INodeStore:
         n = inode.node
         if n:
             del self._node2inode[n]
-        p = inode.parent_node
+        p = inode.leaf_node
         if p:
-            del self._pnode2inode[p]
+            del self._lnode2inode[p]
 
 
 class INode:
 
     refcnt = 1
 
-    def __init__(self, store, node, parent_node, value):
+    def __init__(self, store, node, leaf_node, value):
         self.node = node
-        self.parent_node = parent_node
+        self.leaf_node = leaf_node
         self.value = value
         self.store = store
         # Add reference to the parent inode; we do not want children dangling
-        if parent_node:
-            self.store.get_inode_by_node(parent_node.root).ref()
+        if leaf_node:
+            self.store.get_inode_by_node(leaf_node.root).ref()
         _debug('%s added', self)
 
     def __repr__(self):
-        return '<INode #%d - n:%s pn:%s>' % (self.value, self.node, self.parent_node)
+        return '<INode #%d - n:%s ln:%s>' % (self.value, self.node, self.leaf_node)
 
     def deref(self, count=1):
         assert count > 0
@@ -145,8 +145,8 @@ class INode:
     def remove(self):
         assert self.refcnt == 0
         # Derefer parent
-        if self.parent_node:
-            self.store.get_inode_by_node(self.parent_node.root).deref()
+        if self.leaf_node:
+            self.store.get_inode_by_node(self.leaf_node.root).deref()
         # Remove from the store
         self.store._unregister_inode(self)
 

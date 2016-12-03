@@ -120,7 +120,7 @@ class Operations(llfuse.Operations):
         assert self._initialized
         n = self.forest.getdefault_inode_by_value(parent_inode)
         assert_or_errno(n, ENOENT)
-        cn = n.parent_node
+        cn = n.leaf_node
         if name == b'.':
             pass
         elif name == b'..':
