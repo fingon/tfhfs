@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Sat Dec  3 17:26:37 2016 mstenber
-# Edit time:     24 min
+# Last modified: Sat Dec  3 17:55:51 2016 mstenber
+# Edit time:     26 min
 #
 """
 
@@ -48,12 +48,12 @@ class INodeStore:
         self.first_free_inode = first_free_inode
         self.inodes_waiting_to_remove = set()
 
-    def add_inode(self, node, *, leaf_node=None, value=None):
+    def add_inode(self, node, *, leaf_node=None, value=None, cl=None):
         assert leaf_node is None or isinstance(leaf_node, LeafNode)
         if value is None:
             value = self.first_free_inode
             self.first_free_inode += 1
-        inode = INode(self, node, leaf_node, value)
+        inode = (cl or INode)(self, node, leaf_node, value)
         self._register_inode(inode)
         return inode
 

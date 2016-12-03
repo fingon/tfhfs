@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Sat Dec  3 17:47:09 2016 mstenber
-# Edit time:     528 min
+# Last modified: Sat Dec  3 18:14:15 2016 mstenber
+# Edit time:     542 min
 #
 """This is the 'forest layer' main module.
 
@@ -42,6 +42,7 @@ import logging
 
 import const
 import inode
+from forest_file import FileINode
 from forest_nodes import DirectoryTreeNode, FileBlockTreeNode
 
 _debug = logging.getLogger(__name__).debug
@@ -73,8 +74,7 @@ class Forest(inode.INodeStore):
         inode.INodeStore.__init__(self, first_free_inode=self.root_inode + 1)
         self.dirty_node_set = set()
         block_id = self.storage.get_block_id_by_name(CONTENT_NAME)
-        tn = self.load_dir_node_from_block(block_id)
-        tn.load()
+        tn = self.directory_node_class(forest=self, block_id=block_id)
         self.root = self.add_inode(tn, value=self.root_inode)
 
     def _create(self, mode, dir_inode, name):
@@ -93,7 +93,8 @@ class Forest(inode.INodeStore):
         rn = dir_inode.node
         assert not rn.parent
         self.get_inode_by_node(rn).set_node(rn.add(leaf))
-        inode = self.add_inode(node=node, leaf_node=leaf)
+        inode = self.add_inode(node=node, leaf_node=leaf,
+                               cl=((not is_directory) and FileINode))
         if node:
             node.mark_dirty()
         leaf.set_data('mode', is_directory)
@@ -140,24 +141,13 @@ class Forest(inode.INodeStore):
             if child_inode is None:
                 mode = n.data['mode']
                 if mode & const.DENTRY_MODE_DIR:
-                    cn = self.load_dir_node_from_block(n._block_id)
-                elif mode & const.DENTRY_MODE_MINIFILE:
-                    cn = self.file_node_class.leaf_class(forest=self,
-                                                         block_id=n._block_id)
+                    cn = self.directory_node_class(forest=self,
+                                                   block_id=n._block_id)
+                    cl = None
                 else:
-                    cn = self.load_file_node_from_block(n._block_id)
-                child_inode = self.add_inode(cn, leaf_node=n)
+                    cn = None
+                    cl = FileINode
+                child_inode = self.add_inode(cn, leaf_node=n, cl=cl)
             else:
                 child_inode.ref()
             return child_inode
-
-    def _load_node_from_block(self, is_dir, block_id):
-        cl = is_dir and self.directory_node_class or self.file_node_class
-        tn = cl(forest=self, block_id=block_id)
-        return tn
-
-    def load_dir_node_from_block(self, block_id):
-        return self._load_node_from_block(True, block_id)
-
-    def load_file_node_from_block(self, block_id):
-        return self._load_node_from_block(False, block_id)
