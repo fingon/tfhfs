@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 16:29:53 2016 mstenber
-# Last modified: Thu Jun 30 23:51:35 2016 mstenber
-# Edit time:     32 min
+# Last modified: Tue Dec  6 21:10:33 2016 mstenber
+# Edit time:     34 min
 #
 """
 
@@ -55,6 +55,7 @@ def test_simple():
     assert tn.children == [n2, n1]
     tn.remove_child(n1)
     assert tn.children == [n2]
+    assert list(tn.get_leaves()) == [n2]
 
 
 class LeafierTreeNode(btree.TreeNode):
@@ -78,6 +79,7 @@ def test_large_tree():
         n2 = btree.LeafNode(n.name)
         # Ensure add result looks sane
         assert root.search(n2) is n
+    assert len(list(root.get_leaves())) == len(nodes)
 
     print(root.depth, root.csize)
     # Then, with the fully formed tree, ensure nodes can still be found

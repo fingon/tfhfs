@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 15:36:58 2016 mstenber
-# Last modified: Tue Jul  5 15:29:14 2016 mstenber
-# Edit time:     284 min
+# Last modified: Tue Dec  6 21:10:56 2016 mstenber
+# Edit time:     292 min
 #
 """This is the 'btree' module.
 
@@ -175,6 +175,13 @@ node. """
         if self.is_leafy:
             return 1
         return self.children[0].depth + 1
+
+    def get_leaves(self):
+        for child in self.children:
+            if not isinstance(child, TreeNode):
+                yield child
+            else:
+                yield from child.get_leaves()
 
     def get_smaller_sib(self):
         if not self.parent:
