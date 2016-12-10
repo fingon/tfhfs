@@ -20,12 +20,6 @@ Options for a file:
 
 ** Consider if CBORPickler should also support e.g. IntEnum as argument
 
-** Add TYPE_FILENODE / TYPE_FILEDATA handling as well to forest module
-
-TYPE_FILENODEs will represent large files (contains subtree of nodes with
-blocks), and individual TYPE_FILEDATA represents small (= single
-block-sized) files.
-
 ** Add missing functionality to forest module (e.g. remove API?)
 
 ** Write ops module so that it uses forest for heavy lifting

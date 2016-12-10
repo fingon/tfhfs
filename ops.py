@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Sat Dec  3 17:48:54 2016 mstenber
-# Edit time:     62 min
+# Last modified: Tue Dec  6 21:20:08 2016 mstenber
+# Edit time:     77 min
 #
 """
 
@@ -55,6 +55,12 @@ class Operations(llfuse.Operations):
         self.forest = forest
         llfuse.Operations.__init__(self)
 
+    def _root_leaf_attributes(self):
+        raise llfuse.FUSEError(ENOSYS)
+
+    def _leaf_attributes(self, leaf_node):
+        raise llfuse.FUSEError(ENOSYS)
+
     # Lifecycle functions
 
     def init(self):
@@ -98,7 +104,9 @@ class Operations(llfuse.Operations):
 
     def fsyncdir(self, fh, datasync):
         assert self._initialized
-        raise llfuse.FUSEError(ENOSYS)
+        inode = self.forest.getdefault_inode_by_value(fh)
+        assert inode
+        inode.flush()
 
     def getattr(self, inode, ctx):
         assert self._initialized
@@ -134,13 +142,11 @@ class Operations(llfuse.Operations):
             assert_or_errno(cn, ENOENT)
         if cn is None:
             # Root
-            # TBD
-            pass
+            return self._root_leaf_attributes()
         else:
             # non-root => LeafNode
             assert isinstance(cn, forest_nodes.DirectoryEntry)
-            # TBD
-        raise llfuse.FUSEError(ENOSYS)
+            return self._leaf_attributes(cn)
 
     def mkdir(self, parent_inode, name, mode, ctx):
         assert self._initialized
@@ -162,7 +168,10 @@ class Operations(llfuse.Operations):
 
     def opendir(self, inode, ctx):
         assert self._initialized
-        raise llfuse.FUSEError(ENOSYS)
+        inode = self.forest.getdefault_inode_by_value(inode)
+        assert_or_errno(inode, ENOENT)
+        inode.ref()
+        return inode.value
 
     def read(self, fh, off, size):
         assert self._initialized
@@ -170,7 +179,18 @@ class Operations(llfuse.Operations):
 
     def readdir(self, fh, off):
         assert self._initialized
-        raise llfuse.FUSEError(ENOSYS)
+        inode = self.forest.getdefault_inode_by_value(fh)
+        assert inode
+        pln = None
+        for i, ln in inode.node.get_leaves():
+            # Additions may screw up the tree bit
+            if pln is not None and pln.key > ln.key:
+                pass
+            else:
+                pln = ln
+                if i >= off:
+                    t = (ln.name, self._leaf_attributes(ln), i)
+                    yield t
 
     def readlink(self, inode, ctx):
         assert self._initialized
@@ -182,7 +202,9 @@ class Operations(llfuse.Operations):
 
     def releasedir(self, fh):
         assert self._initialized
-        raise llfuse.FUSEError(ENOSYS)
+        inode = self.forest.getdefault_inode_by_value(fh)
+        assert inode
+        inode.deref()
 
     def removexattr(self, inode, name, ctx):
         assert self._initialized
