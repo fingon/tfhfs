@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:06:01 2016 mstenber
-# Last modified: Sat Nov 26 10:45:15 2016 mstenber
+# Last modified: Sun Dec 11 05:39:40 2016 mstenber
 # Edit time:     12 min
 #
 """
@@ -164,3 +164,10 @@ class CBORPickler:
         for k, v in d.items():
             k2 = self.external2internal_dict[k]
             setattr(o, k2, v)
+
+
+def to_bytes(s):
+    if isinstance(s, str):
+        return s.encode()
+    assert isinstance(s, bytes)
+    return s

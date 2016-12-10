@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Sat Dec  3 18:14:15 2016 mstenber
-# Edit time:     542 min
+# Last modified: Sun Dec 11 06:04:39 2016 mstenber
+# Edit time:     543 min
 #
 """This is the 'forest layer' main module.
 
@@ -42,7 +42,7 @@ import logging
 
 import const
 import inode
-from forest_file import FileINode
+from forest_file import FDStore, FileINode
 from forest_nodes import DirectoryTreeNode, FileBlockTreeNode
 
 _debug = logging.getLogger(__name__).debug
@@ -51,7 +51,7 @@ _debug = logging.getLogger(__name__).debug
 CONTENT_NAME = b'content'
 
 
-class Forest(inode.INodeStore):
+class Forest(inode.INodeStore, FDStore):
     """Forest maintains the (nested set of) trees.
 
     It also keeps track of the dynamic inode entries; when their
@@ -71,6 +71,7 @@ class Forest(inode.INodeStore):
         self.init()
 
     def init(self):
+        FDStore.__init__(self)
         inode.INodeStore.__init__(self, first_free_inode=self.root_inode + 1)
         self.dirty_node_set = set()
         block_id = self.storage.get_block_id_by_name(CONTENT_NAME)

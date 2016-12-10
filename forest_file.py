@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Sat Dec  3 18:21:19 2016 mstenber
-# Edit time:     5 min
+# Last modified: Sun Dec 11 06:07:38 2016 mstenber
+# Edit time:     20 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -43,5 +43,65 @@ Shrinking:
 import inode
 
 
+class FDStore:
+
+    def __init__(self):
+        self.fd2o = {}
+        self.freefds = []
+
+    def allocate_fd(self):
+        if not self.fd2o:
+            fd = 1
+        elif self.freefds:
+            fd = self.freefds.pop(0)
+        else:
+            fd = len(self.fd2o) + 1
+        assert fd not in self.fd2o
+        self.fd2o[fd] = None
+        return fd
+
+    def lookup_fd(self, fd):
+        return self.fd2o[fd]
+
+    def register_fd(self, fd, o):
+        assert o
+        assert self.fd2o[fd] is None
+        self.fd2o[fd] = o
+
+    def unregister_fd(self, fd):
+        self.freefds.append(fd)
+        del self.fd2o[fd]
+
+
+class FileDescriptor:
+    inode = None
+
+    def __init__(self, fd, inode, flags):
+        assert inode
+        self.fd = fd
+        self.inode = inode
+        self.flags = flags
+        self.inode.ref()
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        if self.inode is None:
+            return
+        self.inode.store.unregister_fd(self.fd)
+        self.inode.deref()
+        del self.inode
+
+    def dup(self):
+        return self.inode.open(self.flags)
+
+
 class FileINode(inode.INode):
-    pass
+
+    def open(self, flags):
+        assert isinstance(self.store, FDStore)
+        fd = self.store.allocate_fd()
+        o = FileDescriptor(fd, self, flags)
+        self.store.register_fd(fd, o)
+        return fd

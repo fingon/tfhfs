@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Sat Nov 19 12:37:24 2016 mstenber
-# Edit time:     49 min
+# Last modified: Sun Dec 11 06:53:41 2016 mstenber
+# Edit time:     52 min
 #
 """
 
@@ -42,7 +42,7 @@ class OpsTester(unittest.TestCase):
         r = self.ops.create(parent_inode, name, mode, flags, ctx)
         (fd, attr) = r
         assert isinstance(attr, llfuse.EntryAttributes)
-        self.inode[name] = attr.st_ino
+        self.inodes[name] = attr.st_ino
 
         if data:
             r = self.ops.write(fd, 0, data)
@@ -53,7 +53,7 @@ class OpsTester(unittest.TestCase):
     def _mkdir(self, parent_inode, name, ctx, *, mode=0):
         attr = self.ops.mkdir(parent_inode, name, mode, ctx)
         assert isinstance(attr, llfuse.EntryAttributes)
-        self.inode[name] = attr.st_ino
+        self.inodes[name] = attr.st_ino
 
     def setUp(self):
         self.inodes = {b'.': llfuse.ROOT_INODE}

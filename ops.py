@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Tue Dec  6 21:20:08 2016 mstenber
-# Edit time:     77 min
+# Last modified: Sun Dec 11 06:46:12 2016 mstenber
+# Edit time:     102 min
 #
 """
 
@@ -55,11 +55,27 @@ class Operations(llfuse.Operations):
         self.forest = forest
         llfuse.Operations.__init__(self)
 
-    def _root_leaf_attributes(self):
-        raise llfuse.FUSEError(ENOSYS)
-
     def _leaf_attributes(self, leaf_node):
-        raise llfuse.FUSEError(ENOSYS)
+        entry = llfuse.EntryAttributes()
+        for attr in ('st_mode', 'st_nlink', 'st_uid', 'st_gid',
+                     'st_rdev', 'st_size', 'st_atime_ns', 'st_mtime_ns',
+                     'st_ctime_ns'):
+            v = leaf_node.data.get(attr)
+            if v is not None:
+                setattr(entry, attr, v)
+        return entry
+
+    def _inode_attributes(self, inode):
+        cn = inode.leaf_node
+        if cn is None:
+            entry = llfuse.EntryAttributes()
+            entry.st_ino = llfuse.ROOT_INODE
+            return entry
+        # non-root => LeafNode
+        assert isinstance(cn, forest_nodes.DirectoryEntry)
+        entry = self._leaf_attributes(cn)
+        entry.st_ino = inode.value
+        return entry
 
     # Lifecycle functions
 
@@ -85,12 +101,17 @@ class Operations(llfuse.Operations):
 
     def create(self, parent_inode, name, mode, flags, ctx):
         assert self._initialized
-        raise llfuse.FUSEError(ENOSYS)
+        n = self.forest.getdefault_inode_by_value(parent_inode)
+        assert_or_errno(n, ENOENT)
+        file_inode = self.forest.create_file(n, name)
+        fd = file_inode.open(flags)
+        return fd, self._leaf_attributes(file_inode.leaf_node)
 
     def flush(self, fh):
         assert self._initialized
         assert isinstance(fh, int)
-        raise llfuse.FUSEError(ENOSYS)
+        #raise llfuse.FUSEError(ENOSYS)
+        pass  # we write always immediately, just fsync is slow
 
     def forget(self, inode_list):
         assert self._initialized
@@ -128,25 +149,19 @@ class Operations(llfuse.Operations):
         assert self._initialized
         n = self.forest.getdefault_inode_by_value(parent_inode)
         assert_or_errno(n, ENOENT)
-        cn = n.leaf_node
         if name == b'.':
             pass
         elif name == b'..':
+            cn = n.leaf_node
             if cn:
                 gp_inode = self.forest.getdefault_inode_by_parent(cn.root)
                 if gp_inode:
                     return self.lookup(gp_inode.value, b'.', ctx)
-                cn = None
         else:
-            cn = n.node.search_name(name)
-            assert_or_errno(cn, ENOENT)
-        if cn is None:
-            # Root
-            return self._root_leaf_attributes()
-        else:
-            # non-root => LeafNode
-            assert isinstance(cn, forest_nodes.DirectoryEntry)
-            return self._leaf_attributes(cn)
+            n = self.forest.lookup(n, name)
+            assert_or_errno(n, ENOENT)
+        assert n
+        return self._inode_attributes(n)
 
     def mkdir(self, parent_inode, name, mode, ctx):
         assert self._initialized
@@ -164,7 +179,9 @@ class Operations(llfuse.Operations):
 
     def open(self, inode, flags, ctx):
         assert self._initialized
-        raise llfuse.FUSEError(ENOSYS)
+        inode = self.forest.getdefault_inode_by_value(inode)
+        assert_or_errno(inode, ENOENT)
+        return inode.open(flags)
 
     def opendir(self, inode, ctx):
         assert self._initialized
@@ -182,7 +199,7 @@ class Operations(llfuse.Operations):
         inode = self.forest.getdefault_inode_by_value(fh)
         assert inode
         pln = None
-        for i, ln in inode.node.get_leaves():
+        for i, ln in enumerate(inode.node.get_leaves()):
             # Additions may screw up the tree bit
             if pln is not None and pln.key > ln.key:
                 pass
@@ -198,7 +215,7 @@ class Operations(llfuse.Operations):
 
     def release(self, fh):
         assert self._initialized
-        raise llfuse.FUSEError(ENOSYS)
+        self.forest.lookup_fd(fh).close()
 
     def releasedir(self, fh):
         assert self._initialized
@@ -237,7 +254,11 @@ class Operations(llfuse.Operations):
 
     def unlink(self, parent_inode, name, ctx):
         assert self._initialized
-        raise llfuse.FUSEError(ENOSYS)
+        n = self.forest.getdefault_inode_by_value(parent_inode)
+        assert_or_errno(n, ENOENT)
+        cn = n.node.search_name(name)
+        assert_or_errno(cn, ENOENT)
+        n.node.remove(cn)
 
     def write(self, fh, off, buf):
         assert self._initialized
