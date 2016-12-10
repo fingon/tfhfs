@@ -1,3 +1,4 @@
 pytest
-pytest-xdist
 pytest-catchlog
+pytest-sugar
+pytest-xdist
