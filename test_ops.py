@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Sun Dec 11 06:53:41 2016 mstenber
+# Last modified: Tue Dec 13 05:48:01 2016 mstenber
 # Edit time:     52 min
 #
 """
@@ -26,7 +26,6 @@ would make sense.
 import os
 import unittest
 
-import ddt
 import pytest
 
 import forest
@@ -35,7 +34,6 @@ import ops
 from storage import NopBlockCodec, SQLiteStorage, TypedBlockCodec
 
 
-@ddt.ddt
 class OpsTester(unittest.TestCase):
 
     def _create(self, parent_inode, name, ctx, *, mode=0, flags=0, data=b''):
@@ -79,7 +77,7 @@ class OpsTester(unittest.TestCase):
         # TBD: Ensure no inodes around
 
     @pytest.mark.xfail(raises=llfuse.FUSEError)
-    @ddt.data(
+    @pytest.mark.parametrize('filename,is_root,expect_success', [
         (b'root_dir', True, True),
         (b'root_dir', False, False),
         (b'user_dir', False, True),
@@ -90,8 +88,7 @@ class OpsTester(unittest.TestCase):
         (b'user_file', True, True),
         (b'.', True, True),
         (b'.', False, True),
-    )
-    @ddt.unpack
+    ])
     def test_access(self, filename, is_root, expect_success):
         ctx = is_root and self.rctx_root or self.rctx_user
         r = self.ops.access(self.inodes[filename], os.R_OK, ctx)
