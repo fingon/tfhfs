@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Sun Dec 11 06:04:39 2016 mstenber
-# Edit time:     543 min
+# Last modified: Tue Dec 13 08:01:03 2016 mstenber
+# Edit time:     547 min
 #
 """This is the 'forest layer' main module.
 
@@ -68,6 +68,8 @@ class Forest(inode.INodeStore, FDStore):
     def __init__(self, storage, root_inode):
         self.root_inode = root_inode
         self.storage = storage
+        self.storage.set_block_id_has_references_callback(
+            self.inode_has_block_id)
         self.init()
 
     def init(self):
@@ -132,6 +134,15 @@ class Forest(inode.INodeStore, FDStore):
         self.remove_old_inodes()
 
         return rv
+
+    def inode_has_block_id(self, block_id):
+        # TBD: This is not super efficient. However, it SHOULD be
+        # called only when deleting blocks, which should not be that
+        # common occurence (assume read-heavy workloads). This could
+        # use a lazy property of some kind, perhaps..
+        for node in self._node2inode.keys():
+            if node._block_id == block_id:
+                return True
 
     def lookup(self, dir_inode, name):
         assert isinstance(dir_inode, inode.INode)

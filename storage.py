@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Tue Dec 13 07:52:38 2016 mstenber
-# Edit time:     364 min
+# Last modified: Tue Dec 13 07:56:38 2016 mstenber
+# Edit time:     367 min
 #
 """This is the 'storage layer' main module.
 
@@ -287,9 +287,8 @@ class ReferringStorage(Storage):
     referenced_refcnt0_block_ids = None
 
     def __init__(self, block_id_has_references_callback=None, **kw):
-        if block_id_has_references_callback:
-            self.block_id_has_references_callback = \
-                block_id_has_references_callback
+        self.set_block_id_has_references_callback(
+            block_id_has_references_callback)
         Storage.__init__(self, **kw)
 
     def block_id_has_references_callback(self, block_id):
@@ -321,6 +320,11 @@ class ReferringStorage(Storage):
                         deleted = True
             if not deleted:
                 return
+
+    def set_block_id_has_references_callback(self, callback):
+        self.block_id_has_references_callback = callback
+        if callback is None:
+            del self.block_id_has_references_callback
 
 
 class SQLiteStorage(ReferringStorage):
@@ -573,6 +577,9 @@ class DelayedStorage(Storage):
 
     def get_block_id_by_name(self, n):
         return self._get_block_id_by_name(n)[0]
+
+    def set_block_id_has_references_callback(self, callback):
+        self.storage.set_block_id_has_references_callback(callback)
 
     def set_block_name_raw(self, block_id, n):
         self._get_block_id_by_name(n)[0] = block_id

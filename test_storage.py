@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Tue Dec 13 07:50:12 2016 mstenber
-# Edit time:     127 min
+# Last modified: Tue Dec 13 07:57:22 2016 mstenber
+# Edit time:     129 min
 #
 """
 
@@ -48,7 +48,7 @@ def _flush_twice(s, flush):
 def _prod_storage(s, flush=_nop):
     # By default we retain the block with idk id ('keep')
     if flush is not _nop:
-        s.block_id_has_references_callback = lambda x: x == b'idk'
+        s.set_block_id_has_references_callback(lambda x: x == b'idk')
 
     _debug('## initial foo=bar')
     # refcnt = 1
@@ -131,7 +131,7 @@ def _prod_storage(s, flush=_nop):
         assert s.get_block_by_id(b'idk')[1] == 0
 
         # Back to class default
-        del s.block_id_has_references_callback
+        s.set_block_id_has_references_callback(None)
         _flush_twice(s, flush)
         assert not s.get_block_by_id(b'idk')
 
@@ -144,14 +144,6 @@ def _prod_delayedstorage(s, s2, flush=_nop):
     # DelayedStorage should not really care about the callback to start with
     assert isinstance(s, DelayedStorage)
     assert not isinstance(s2, DelayedStorage)
-
-    def _wrapped_has_references(block_id):
-        try:
-            return s.block_id_has_references_callback(block_id)
-        except AttributeError:
-            pass
-    s2.block_id_has_references_callback = _wrapped_has_references
-
     _prod_storage(s, flush=flush)
     # Should be nop as we deleted everything we added
     if s.maximum_dirty_size:
