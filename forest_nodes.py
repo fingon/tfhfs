@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Sat Dec  3 17:48:08 2016 mstenber
-# Edit time:     0 min
+# Last modified: Tue Dec 13 05:13:16 2016 mstenber
+# Edit time:     3 min
 #
 """
 
@@ -99,13 +99,7 @@ class LoadedTreeNode(DirtyMixin, btree.TreeNode):
             child.flush()
         data = self.to_data()
         block_id = sha256(*data)
-        if block_id == self._block_id:
-            return
-        self._forest.storage.refer_or_store_block(block_id, data)
-        if self._block_id is not None:
-            self._forest.storage.release_block(self._block_id)
-        self._block_id = block_id
-        return True
+        return self.set_block(block_id, data)
 
     @property
     def pickled_child_list(self):
@@ -125,6 +119,15 @@ class LoadedTreeNode(DirtyMixin, btree.TreeNode):
     def search_name(self, name):
         n = self.leaf_class(self._forest, name=name)
         return self.search(n)
+
+    def set_block(self, block_id, data):
+        if block_id == self._block_id:
+            return
+        self._forest.storage.refer_or_store_block(block_id, data)
+        if self._block_id is not None:
+            self._forest.storage.release_block(self._block_id)
+        self._block_id = block_id
+        return True
 
     def to_data(self):
         t = self.entry_type

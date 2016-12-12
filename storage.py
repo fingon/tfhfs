@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Tue Nov 29 18:53:16 2016 mstenber
-# Edit time:     264 min
+# Last modified: Tue Dec 13 05:35:43 2016 mstenber
+# Edit time:     280 min
 #
 """This is the 'storage layer' main module.
 
@@ -162,14 +162,43 @@ class CompressingTypedBlockCodec(TypedBlockCodec):
         return (t, d)
 
 
+class _NopIterator:
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        raise StopIteration
+
+_nopiterator = _NopIterator()
+
+
 class Storage:
 
-    def __init__(self, block_data_references_callback=None):
-        self.block_data_references_callback = block_data_references_callback
+    referenced_refcnt0_block_ids = None
+
+    def __init__(self, block_data_references_callback=None,
+                 block_id_has_references_callback=None):
+        self.block_data_references_callback = \
+            block_data_references_callback or (lambda x: _nopiterator)
+        self.block_id_has_references_callback = \
+            block_id_has_references_callback or (lambda x: False)
+
+    def flush(self):
+        """ Attempt to get rid of dangling reference count 0 blocks. """
+        while self.referenced_refcnt0_block_ids:
+            s = self.referenced_refcnt0_block_ids
+            del self.referenced_refcnt0_block_ids
+            deleted = False
+            for block_id in s:
+                (data, refcnt) = self.get_block_by_id(block_id)
+                if not refcnt:
+                    if self.on_delete_block_id(block_id):
+                        deleted = True
+            if not deleted:
+                return
 
     def get_block_data_references(self, block_data):
-        if not self.block_data_references_callback:
-            return
         yield from self.block_data_references_callback(block_data)
 
     def get_block_by_id(self, block_id):
@@ -193,6 +222,11 @@ set, None is returned."""
             self.refer_block(block_id)
 
     def on_delete_block_id(self, block_id):
+        if self.block_id_has_references_callback(block_id):
+            if not self.referenced_refcnt0_block_ids:
+                self.referenced_refcnt0_block_ids = set()
+            self.referenced_refcnt0_block_ids.add(block_id)
+            return
         r = self.get_block_by_id(block_id)
         assert r
         (block_data, block_refcnt) = r
@@ -200,6 +234,7 @@ set, None is returned."""
         for block_id2 in self.get_block_data_references(block_data):
             _debug('on_delete_block_id %s: drop to %s', block_id, block_id2)
             self.release_block(block_id2)
+        return True
 
     def refer_block(self, block_id):
         r = self.get_block_by_id(block_id)
@@ -443,6 +478,7 @@ class DelayedStorage(Storage):
                 self.cache_size -= len(block_data)
 
     def flush(self):
+        Storage.flush(self)
         _debug('flush')
         ops = 0
         ops += self._flush_blocks(1)

@@ -22,15 +22,46 @@ Options for a file:
 
 ** Add missing functionality to forest module (e.g. remove API?)
 
-** Write ops module so that it uses forest for heavy lifting
-
 ** Write more thorough filesystem tests to test_ops or elsewhere
 
 *** readdir semantics
 
 mutation should not result in non-mutated files being omitted/returned
 twice (this should be trivially given we iterate automatically by
-filename within the tree order?) 
+filename within the tree order?)
 
 * Pending (eventually)
 
+** Work out how sharing of storage backends works
+
+The main question is when to rm blocks for real. If we have exclusive
+access to a storage, can rm them if there is no tree (either root-based
+forest or inode based forest) referring to them.
+
+Persisting inode-based references (in-memory construct) seems like
+undesirable design (causes more disk churn). Ways around it:
+
+*** (Always) exclusive use of storage backend
+
+No need to worry about other writers => no need to do the churn to actually
+disk.
+
+*** No cleanups when shared
+
+With one main writer, can have it get exclusive (r+w) lock, and drop it
+infrequently or on demand if there are other potential writers. While
+multiple writers are present, no cleanups.
+
+*** Shared cleanups
+
+- post read-only notice
+
+- wait for other writers to _increment_ their inodes' reference counts to
+  disk (and switch to read-only mode)
+
+- rm blocks based on update dreference counts
+
+- remove read-only notice
+
+Electing the cleaner to be the one with most in-memory references seems
+sensible but possibly minor optimization.
