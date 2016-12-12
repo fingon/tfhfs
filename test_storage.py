@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Sat Jul  2 18:59:56 2016 mstenber
-# Edit time:     95 min
+# Last modified: Tue Dec 13 07:50:12 2016 mstenber
+# Edit time:     127 min
 #
 """
 
@@ -46,6 +46,9 @@ def _flush_twice(s, flush):
 
 
 def _prod_storage(s, flush=_nop):
+    # By default we retain the block with idk id ('keep')
+    if flush is not _nop:
+        s.block_id_has_references_callback = lambda x: x == b'idk'
 
     _debug('## initial foo=bar')
     # refcnt = 1
@@ -67,6 +70,7 @@ def _prod_storage(s, flush=_nop):
     _debug('## final release of foo')
     assert not s.release_block(b'foo')
     _flush_twice(s, flush)
+    _debug('# foo should be gone')
     assert s.get_block_data_by_id(b'foo') == None
 
     # precond - 'bar' should not exist
@@ -117,10 +121,37 @@ def _prod_storage(s, flush=_nop):
     _flush_twice(s, flush)
     assert not s.get_block_by_id(b'id1')
     assert not s.get_block_by_id(b'id2')
+
+    # Add fictional block which has external references
+    if flush is not _nop:
+        s.store_block(b'idk', b'contentk')
+        _flush_twice(s, flush)
+        s.release_block(b'idk')
+        _flush_twice(s, flush)
+        assert s.get_block_by_id(b'idk')[1] == 0
+
+        # Back to class default
+        del s.block_id_has_references_callback
+        _flush_twice(s, flush)
+        assert not s.get_block_by_id(b'idk')
+
     _debug('_prod_storage done')
 
 
 def _prod_delayedstorage(s, s2, flush=_nop):
+    # this isn't really pretty but oh well..
+    # _prod_storage uses the initial callback, and so should we, although
+    # DelayedStorage should not really care about the callback to start with
+    assert isinstance(s, DelayedStorage)
+    assert not isinstance(s2, DelayedStorage)
+
+    def _wrapped_has_references(block_id):
+        try:
+            return s.block_id_has_references_callback(block_id)
+        except AttributeError:
+            pass
+    s2.block_id_has_references_callback = _wrapped_has_references
+
     _prod_storage(s, flush=flush)
     # Should be nop as we deleted everything we added
     if s.maximum_dirty_size:
@@ -216,45 +247,25 @@ def test_sqlitestorage():
     _prod_storage(s)
 
 
-@pytest.mark.xfail(raises=sqlite3.OperationalError)
-def test_sqlitestorage_error():
+@pytest.mark.parametrize('kwargs', [
+    pytest.mark.xfail({}, raises=sqlite3.OperationalError),
+    dict(ignore_errors=True),
+])
+def test_sqlitestorage_get_execute_error(kwargs):
     s = SQLiteStorage()
-    s._get_execute_result('BLORB')
+    s._get_execute_result('BLORB', **kwargs)
 
 
-def test_sqlitestorage_error_ignored():
-    s = SQLiteStorage()
-    s._get_execute_result('BLORB', ignore_errors=True)
-
-
-def test_delayedstorage_immediate_flush():
+@pytest.mark.parametrize('storage_attrs, use_flush',
+                         [
+                             ({}, True),
+                             ({'maximum_cache_size': 1}, True),  # no cache
+                             ({'maximum_dirty_size': 1},  True),  # no dirty
+                             ({}, False),
+                         ])
+def test_delayedstorage(storage_attrs, use_flush):
     s2 = SQLiteStorage()
     s = DelayedStorage(s2)
-    _prod_delayedstorage(s, s2, s.flush)
-
-
-def test_delayedstorage_immediate_flush_no_cache():
-    s2 = SQLiteStorage()
-    s = DelayedStorage(s2)
-    s.maximum_cache_size = 1
-    _prod_delayedstorage(s, s2, s.flush)
-
-
-def test_delayedstorage_immediate_flush_no_dirty():
-    s2 = SQLiteStorage()
-    s = DelayedStorage(s2)
-    s.maximum_dirty_size = 1
-    _prod_delayedstorage(s, s2, s.flush)
-
-
-def test_delayedstorage_no_dirty():
-    s2 = SQLiteStorage()
-    s = DelayedStorage(s2)
-    s.maximum_dirty_size = 1
-    _prod_delayedstorage(s, s2)
-
-
-def test_delayedstorage():
-    s2 = SQLiteStorage()
-    s = DelayedStorage(s2)
-    _prod_delayedstorage(s, s2)
+    for k, v in storage_attrs.items():
+        setattr(s, k, v)
+    _prod_delayedstorage(s, s2, use_flush and s.flush or _nop)
