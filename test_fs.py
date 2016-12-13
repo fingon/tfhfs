@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Sun Dec 11 06:49:37 2016 mstenber
-# Edit time:     38 min
+# Last modified: Tue Dec 13 20:14:35 2016 mstenber
+# Edit time:     39 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -39,9 +39,6 @@ class MockFile:
         self.fd = fd
         self.ofs = 0
         self.flags = flags
-        if flags & os.O_APPEND:
-            # TBD: determine offset to write at
-            pass
 
     def __enter__(self):
         return self
@@ -70,6 +67,7 @@ class MockFile:
     def write(self, s):
         if not (self.flags & (os.O_RDWR | os.O_WRONLY)):
             raise IOError
+        # TBD: O_APPEND = write always to the end
         pass
 
 
@@ -102,8 +100,6 @@ class MockFS:
             fd = self.ops.open(attrs.st_ino, flags, self.rctx_user)
             self.ops.forget([(attrs.st_ino, 1)])
         except llfuse.FUSEError as e:
-            if mode == 'a':
-                raise
             _debug('exception %s', repr(e))
             if not (flags & (os.O_WRONLY | os.O_RDWR)):
                 raise IOError(errno.ENOENT)

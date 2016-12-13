@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Tue Dec 13 05:13:16 2016 mstenber
-# Edit time:     3 min
+# Last modified: Tue Dec 13 21:08:19 2016 mstenber
+# Edit time:     6 min
 #
 """
 
@@ -178,7 +178,14 @@ class NamedLeafNode(DataMixin, btree.LeafNode):
 
 
 class DirectoryEntry(NamedLeafNode):
-    pass
+
+    @property
+    def is_dir(self):
+        return (self.data['mode'] & const.DENTRY_MODE_DIR)
+
+    @property
+    def is_file(self):
+        return not self.is_dir
 
 
 class DirectoryTreeNode(LoadedTreeNode):

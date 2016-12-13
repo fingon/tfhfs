@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Tue Dec 13 05:48:01 2016 mstenber
-# Edit time:     52 min
+# Last modified: Tue Dec 13 21:05:52 2016 mstenber
+# Edit time:     71 min
 #
 """
 
@@ -23,8 +23,8 @@ would make sense.
 
 """
 
+import errno
 import os
-import unittest
 
 import pytest
 
@@ -34,9 +34,28 @@ import ops
 from storage import NopBlockCodec, SQLiteStorage, TypedBlockCodec
 
 
-class OpsTester(unittest.TestCase):
+class OpsContext:
 
-    def _create(self, parent_inode, name, ctx, *, mode=0, flags=0, data=b''):
+    def __init__(self):
+        self.inodes = {b'.': llfuse.ROOT_INODE}
+        storage = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
+        f = forest.Forest(storage, llfuse.ROOT_INODE)
+        self.ops = ops.Operations(f)
+        self.rctx_root = llfuse.RequestContext()
+        self.rctx_user = llfuse.RequestContext(uid=42, gid=7, pid=123)
+        self.ops.init()
+
+        # Create user-owned directory + file
+        self.mkdir(llfuse.ROOT_INODE, b'root_dir', self.rctx_root)
+        self.create(llfuse.ROOT_INODE, b'root_file', self.rctx_root,
+                    data=b'root')
+
+        # Create root-owned directory + file
+        self.mkdir(llfuse.ROOT_INODE, b'user_dir', self.rctx_user)
+        self.create(llfuse.ROOT_INODE, b'user_file', self.rctx_user,
+                    data=b'user')
+
+    def create(self, parent_inode, name, ctx, *, mode=0, flags=0, data=b''):
         r = self.ops.create(parent_inode, name, mode, flags, ctx)
         (fd, attr) = r
         assert isinstance(attr, llfuse.EntryAttributes)
@@ -48,109 +67,107 @@ class OpsTester(unittest.TestCase):
 
         self.ops.release(fd)
 
-    def _mkdir(self, parent_inode, name, ctx, *, mode=0):
+    def mkdir(self, parent_inode, name, ctx, *, mode=0):
         attr = self.ops.mkdir(parent_inode, name, mode, ctx)
         assert isinstance(attr, llfuse.EntryAttributes)
         self.inodes[name] = attr.st_ino
 
-    def setUp(self):
-        self.inodes = {b'.': llfuse.ROOT_INODE}
-        storage = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
-        f = forest.Forest(storage, llfuse.ROOT_INODE)
-        self.ops = ops.Operations(f)
-        self.rctx_root = llfuse.RequestContext()
-        self.rctx_user = llfuse.RequestContext(uid=42, gid=7, pid=123)
-        self.ops.init()
 
-        # Create user-owned directory + file
-        self._mkdir(llfuse.ROOT_INODE, b'root_dir', self.rctx_root)
-        self._create(llfuse.ROOT_INODE, b'root_file', self.rctx_root,
-                     data=b'root')
+@pytest.fixture
+def oc():
+    r = OpsContext()
+    yield r
+    r.ops.destroy()
 
-        # Create root-owned directory + file
-        self._mkdir(llfuse.ROOT_INODE, b'user_dir', self.rctx_user)
-        self._create(llfuse.ROOT_INODE, b'user_file', self.rctx_user,
-                     data=b'user')
 
-    def tearDown(self):
-        self.ops.destroy()
-        # TBD: Ensure no inodes around
+@pytest.mark.xfail(raises=llfuse.FUSEError)
+@pytest.mark.parametrize('filename,is_root,expect_success', [
+    (b'root_dir', True, True),
+    (b'root_dir', False, False),
+    (b'user_dir', False, True),
+    (b'user_dir', True, True),
+    (b'root_file', True, True),
+    (b'root_file', False, False),
+    (b'user_file', False, True),
+    (b'user_file', True, True),
+    (b'.', True, True),
+    (b'.', False, True),
+])
+def test_access(oc, filename, is_root, expect_success):
+    ctx = is_root and oc.rctx_root or oc.rctx_user
+    r = oc.ops.access(oc.inodes[filename], os.R_OK, ctx)
+    assert r == expect_success
 
-    @pytest.mark.xfail(raises=llfuse.FUSEError)
-    @pytest.mark.parametrize('filename,is_root,expect_success', [
-        (b'root_dir', True, True),
-        (b'root_dir', False, False),
-        (b'user_dir', False, True),
-        (b'user_dir', True, True),
-        (b'root_file', True, True),
-        (b'root_file', False, False),
-        (b'user_file', False, True),
-        (b'user_file', True, True),
-        (b'.', True, True),
-        (b'.', False, True),
-    ])
-    def test_access(self, filename, is_root, expect_success):
-        ctx = is_root and self.rctx_root or self.rctx_user
-        r = self.ops.access(self.inodes[filename], os.R_OK, ctx)
-        assert r == expect_success
+# successful create implicitly tested in create of setUp
 
-    # successful create implicitly tested in _create of setUp
-    @pytest.mark.xfail(raises=llfuse.FUSEError)
-    def test_create_fail(self):
-        self._create(llfuse.ROOT_INODE, b'root_file', self.rctx_user)
 
-    # destroy implicitly tested in tearDown
-    @pytest.mark.xfail(raises=llfuse.FUSEError)
-    def test_flush(self):
-        # TBD - it should not have any real semantics?
-        pass
+@pytest.mark.xfail(raises=llfuse.FUSEError)
+def testcreate_fail(oc):
+    oc.create(llfuse.ROOT_INODE, b'root_file', oc.rctx_user)
 
-    # mkdir implicitly tested in _mkdir
-    @pytest.mark.xfail(raises=llfuse.FUSEError)
-    def test_basic_file_io(self):
-        r = self.ops.create(llfuse.ROOT_INODE, 'x', 0, 0, self.rctx_root)
-        (fh, attr) = r
-        assert isinstance(attr, llfuse.EntryAttributes)
+# destroy implicitly tested in tearDown
 
-        fd = self.ops.open(attr.st_ino, 0, self.rctx_root)
-        assert isinstance(fd, int)
 
-        self.ops.fsync(fh, False)
-        self.ops.fsync(fh, True)
+@pytest.mark.xfail(raises=llfuse.FUSEError)
+def test_flush(oc):
+    # TBD - it should not have any real semantics?
+    pass
 
-        self.ops.flush(fd)  # should be nop?
+# mkdir implicitly tested in mkdir
 
-        r = self.ops.read(fd, 0, 123)
-        assert not r
 
-        r = self.ops.write(fd, 0, b'foo')
-        assert r == 3
+@pytest.mark.xfail(raises=llfuse.FUSEError)
+def test_basic_file_io(oc):
+    r = oc.ops.create(llfuse.ROOT_INODE, b'x', 0, 0, oc.rctx_root)
+    (fh, attr) = r
+    assert isinstance(attr, llfuse.EntryAttributes)
 
-        r = self.ops.read(fd, 0, 123)
-        assert r == b'foo'
+    fd = oc.ops.open(attr.st_ino, 0, oc.rctx_root)
+    assert isinstance(fd, int)
 
-        self.ops.fsync(fh, False)
-        self.ops.fsync(fh, True)
+    oc.ops.fsync(fh, False)
+    oc.ops.fsync(fh, True)
 
-        self.ops.release(fd)
+    oc.ops.flush(fd)  # should be nop?
 
-        self.ops.forget((attr.st_ino, 1))
+    r = oc.ops.read(fd, 0, 123)
+    assert not r
 
-    @pytest.mark.xfail(raises=llfuse.FUSEError)
-    def test_getattr(self, inode, ctx):
-        r = self.ops.getattr(llfuse.ROOT_INODE, self.rctx_root)
-        assert isinstance(r, llfuse.EntryAttributes)
-        assert r.st_ino == llfuse.ROOT_INODE
+    r = oc.ops.write(fd, 0, b'foo')
+    assert r == 3
 
-        # TBD: Test more?
+    r = oc.ops.read(fd, 0, 123)
+    assert r == b'foo'
 
-    @pytest.mark.xfail(raises=llfuse.FUSEError)
-    def test_basic_xattr(self):
-        try:
-            self.ops.getxattr(llfuse.ROOT_INODE, b'foo', self.rctx_root)
-            raise
-        except llfuse.FUSEError as e:
-            assert e.errno_ == errno.ENOATTR
+    oc.ops.fsync(fh, False)
+    oc.ops.fsync(fh, True)
+
+    oc.ops.release(fd)
+
+    oc.ops.forget((attr.st_ino, 1))
+
+
+@pytest.mark.xfail(raises=llfuse.FUSEError)
+@pytest.mark.parametrize('inode,user_ctx', [
+    (llfuse.ROOT_INODE, True),
+    (llfuse.ROOT_INODE, False),
+])
+def test_getattr(oc, inode, user_ctx):
+    rctx = user_ctx and oc.rctx_user or oc.rctx_root
+    r = oc.ops.getattr(inode, rctx)
+    assert isinstance(r, llfuse.EntryAttributes)
+    assert r.st_ino == inode
+
+    # TBD: Test more?
+
+
+@pytest.mark.xfail(raises=llfuse.FUSEError)
+def test_basic_xattr(oc):
+    try:
+        oc.ops.getxattr(llfuse.ROOT_INODE, b'foo', oc.rctx_root)
+        raise
+    except llfuse.FUSEError as e:
+        assert e.errno == errno.ENOATTR
 
 
 def test_ensure_full_implementation():

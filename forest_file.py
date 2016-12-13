@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Sun Dec 11 06:07:38 2016 mstenber
-# Edit time:     20 min
+# Last modified: Tue Dec 13 20:43:51 2016 mstenber
+# Edit time:     24 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -39,6 +39,8 @@ Shrinking:
  medium -> small: small remove block_id, set block_data
 
 """
+
+import os
 
 import inode
 
@@ -96,12 +98,27 @@ class FileDescriptor:
     def dup(self):
         return self.inode.open(self.flags)
 
+    def read(self, ofs, size):
+        pass
+
+    def write(self, ofs, buf):
+        # TBD: really implement this
+        return len(buf)
+
 
 class FileINode(inode.INode):
 
     def open(self, flags):
         assert isinstance(self.store, FDStore)
+        if flags & os.O_TRUNC:
+            self.trunc()
         fd = self.store.allocate_fd()
         o = FileDescriptor(fd, self, flags)
         self.store.register_fd(fd, o)
         return fd
+
+    def set_size(self, n):
+        pass
+
+    def trunc(self):
+        self.set_size(0)

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Sun Dec 11 06:46:12 2016 mstenber
-# Edit time:     102 min
+# Last modified: Tue Dec 13 21:08:34 2016 mstenber
+# Edit time:     121 min
 #
 """
 
@@ -36,7 +36,8 @@ http://pythonhosted.org/llfuse/fuse_api.html
 
 """
 
-from errno import EEXIST, ENOENT, ENOSYS
+import os
+from errno import EEXIST, ENOATTR, ENOENT, ENOSYS, ENOTEMPTY
 
 import forest_nodes
 import llfuse
@@ -103,14 +104,17 @@ class Operations(llfuse.Operations):
         assert self._initialized
         n = self.forest.getdefault_inode_by_value(parent_inode)
         assert_or_errno(n, ENOENT)
-        file_inode = self.forest.create_file(n, name)
+        file_inode = self.forest.lookup(n, name)
+        if file_inode:
+            assert_or_errno(not (flags & os.O_EXCL), EEXIST)
+        else:
+            file_inode = self.forest.create_file(n, name)
         fd = file_inode.open(flags)
         return fd, self._leaf_attributes(file_inode.leaf_node)
 
     def flush(self, fh):
         assert self._initialized
         assert isinstance(fh, int)
-        #raise llfuse.FUSEError(ENOSYS)
         pass  # we write always immediately, just fsync is slow
 
     def forget(self, inode_list):
@@ -135,7 +139,13 @@ class Operations(llfuse.Operations):
 
     def getxattr(self, inode, name, ctx):
         assert self._initialized
-        raise llfuse.FUSEError(ENOSYS)
+        inode = self.forest.getdefault_inode_by_value(inode)
+        assert_or_errno(inode.leaf_node, ENOATTR)  # TBD: handle root xattr
+        xa = inode.leaf_node.data.get('xattr')
+        assert_or_errno(xa, ENOATTR)
+        v = xa.get(name)
+        assert_or_errno(v, ENOATTR)
+        return v
 
     def link(self, inode, new_parent_inode, new_name, ctx):
         assert self._initialized
@@ -192,7 +202,7 @@ class Operations(llfuse.Operations):
 
     def read(self, fh, off, size):
         assert self._initialized
-        raise llfuse.FUSEError(ENOSYS)
+        return self.forest.lookup_fd(fh).read(off, size)
 
     def readdir(self, fh, off):
         assert self._initialized
@@ -235,6 +245,12 @@ class Operations(llfuse.Operations):
     def rmdir(self, parent_inode, name, ctx):
         assert self._initialized
         raise llfuse.FUSEError(ENOSYS)
+        n = self.forest.getdefault_inode_by_value(parent_inode)
+        assert_or_errno(n, ENOENT)
+        n = self.forest.lookup(n, name)
+        assert_or_errno(n and n.leaf_node.is_dir and n.node, ENOENT)
+        assert_or_errno(not n.children, ENOTEMPTY)
+        n.leaf_node.root.remove(n.leaf_node)
 
     def setattr(self, inode, attr, fields, fh, ctx):
         assert self._initialized
@@ -257,9 +273,9 @@ class Operations(llfuse.Operations):
         n = self.forest.getdefault_inode_by_value(parent_inode)
         assert_or_errno(n, ENOENT)
         cn = n.node.search_name(name)
-        assert_or_errno(cn, ENOENT)
+        assert_or_errno(cn and cn.is_file, ENOENT)
         n.node.remove(cn)
 
     def write(self, fh, off, buf):
         assert self._initialized
-        raise llfuse.FUSEError(ENOSYS)
+        return self.forest.lookup_fd(fh).write(off, buf)

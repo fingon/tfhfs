@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Tue Dec 13 08:01:03 2016 mstenber
-# Edit time:     547 min
+# Last modified: Tue Dec 13 21:07:27 2016 mstenber
+# Edit time:     548 min
 #
 """This is the 'forest layer' main module.
 
@@ -151,8 +151,7 @@ class Forest(inode.INodeStore, FDStore):
         if n:
             child_inode = self.getdefault_inode_by_leaf_node(n)
             if child_inode is None:
-                mode = n.data['mode']
-                if mode & const.DENTRY_MODE_DIR:
+                if n.is_dir:
                     cn = self.directory_node_class(forest=self,
                                                    block_id=n._block_id)
                     cl = None
