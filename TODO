@@ -1,6 +1,6 @@
 -*- outline -*-
 
-* Pending (short-term)
+* Pending (before it can be used for ANYTHING)
 
 ** Implement files sensibly
 
@@ -18,19 +18,27 @@ Options for a file:
 
 - tree of data blocks
 
-** Consider if CBORPickler should also support e.g. IntEnum as argument
-
 ** Add missing functionality to forest module (e.g. remove API?)
 
 ** Write more thorough filesystem tests to test_ops or elsewhere
 
-*** readdir semantics
+** Correct readdir semantics
 
 mutation should not result in non-mutated files being omitted/returned
 twice (this should be trivially given we iterate automatically by
 filename within the tree order?)
 
+* Pending before it can be used for single-user, multiple-installations
+
+** Implement tree sync code (SHOULD be straightforward, but who knows)
+
+* Pending before it can be used for multi-user
+
+** Implement permission handling
+
 * Pending (eventually)
+
+** Consider if CBORPickler should also support e.g. IntEnum as argument
 
 ** Work out how sharing of storage backends works
 
