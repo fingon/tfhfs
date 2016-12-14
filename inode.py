@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Thu Dec 15 06:31:45 2016 mstenber
-# Edit time:     32 min
+# Last modified: Thu Dec 15 07:23:03 2016 mstenber
+# Edit time:     34 min
 #
 """
 
@@ -134,6 +134,10 @@ class INode:
         self.refcnt -= count
         assert self.refcnt >= 0
         return self
+
+    def flush(self):
+        # TBD: Implement more granual flush; this flushes whole fs!
+        self.store.flush()
 
     @property
     def direntry(self):

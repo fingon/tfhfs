@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Thu Dec 15 07:03:06 2016 mstenber
-# Edit time:     137 min
+# Last modified: Thu Dec 15 07:41:22 2016 mstenber
+# Edit time:     144 min
 #
 """
 
@@ -122,11 +122,14 @@ class Operations(llfuse.Operations):
         assert self._initialized
         for inode, nlookup in inode_list:
             # reduce reference count of 'inode' by 'nlookup'
-            self.forest.get_inode_by_value(inode).deref(nlookup)
+            self.forget1(inode, nlookup)
+
+    def forget1(self, inode, count=1):
+        self.forest.get_inode_by_value(inode).deref(count)
 
     def fsync(self, fh, datasync):
         assert self._initialized
-        raise llfuse.FUSEError(ENOSYS)
+        self.forest.lookup_fd(fh).flush()
 
     def fsyncdir(self, fh, datasync):
         assert self._initialized
@@ -141,8 +144,7 @@ class Operations(llfuse.Operations):
     def getxattr(self, inode, name, ctx):
         assert self._initialized
         inode = self.forest.getdefault_inode_by_value(inode)
-        assert_or_errno(inode.leaf_node, ENOATTR)  # TBD: handle root xattr
-        xa = inode.leaf_node.data.get('xattr')
+        xa = inode.direntry.data.get('xattr')
         assert_or_errno(xa, ENOATTR)
         v = xa.get(name)
         assert_or_errno(v, ENOATTR)
@@ -154,7 +156,8 @@ class Operations(llfuse.Operations):
 
     def listxattr(self, inode, ctx):
         assert self._initialized
-        raise llfuse.FUSEError(ENOSYS)
+        inode = self.forest.getdefault_inode_by_value(inode)
+        return inode.direntry.data.get('xattr', {}).keys()
 
     def lookup(self, parent_inode, name, ctx):
         assert self._initialized
@@ -258,9 +261,12 @@ class Operations(llfuse.Operations):
         assert self._initialized
         raise llfuse.FUSEError(ENOSYS)
 
-    def setxattr(self, inode, attr, fields, fh, ctx):
+    def setxattr(self, inode, name, value, ctx):
         assert self._initialized
-        raise llfuse.FUSEError(ENOSYS)
+        inode = self.forest.getdefault_inode_by_value(inode)
+        xa = inode.direntry.data.get('xattr', {})
+        xa[name] = value
+        inode.direntry.set_data('xattr', xa)
 
     def statfs(self, ctx):
         assert self._initialized

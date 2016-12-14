@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Thu Dec 15 07:01:45 2016 mstenber
-# Edit time:     209 min
+# Last modified: Thu Dec 15 07:20:52 2016 mstenber
+# Edit time:     210 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -113,6 +113,9 @@ class FileDescriptor:
     def dup(self):
         fd2 = self.inode.open(self.flags & ~os.O_TRUNC)
         return fd2
+
+    def flush(self):
+        self.inode.flush()
 
     def read(self, ofs, size):
         return self.inode.read(ofs, size)

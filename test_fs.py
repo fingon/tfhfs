@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Thu Dec 15 06:37:57 2016 mstenber
-# Edit time:     105 min
+# Last modified: Thu Dec 15 07:25:27 2016 mstenber
+# Edit time:     106 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -116,11 +116,11 @@ class MockFS:
                                     self.rctx_user)
             if flags & (os.O_CREAT | os.O_EXCL) == (os.O_CREAT | os.O_EXCL):
                 if attrs:
-                    self.ops.forget([(attrs.st_ino, 1)])
+                    self.ops.forget1(attrs.st_ino)
                     raise IOError
             else:
                 fd = self.ops.open(attrs.st_ino, flags, self.rctx_user)
-                self.ops.forget([(attrs.st_ino, 1)])
+                self.ops.forget1(attrs.st_ino)
         except llfuse.FUSEError as e:
             _debug('exception %s', repr(e))
         if fd is None:
@@ -161,7 +161,7 @@ class MockFS:
             attrs = self.ops.lookup(inode, path, self.rctx_user)
         except llfuse.FUSEError:
             raise FileNotFoundError
-        self.ops.forget([(attrs.st_ino, 1)])
+        self.ops.forget1(attrs.st_ino)
         return attrs
 
     def os_unlink(self, path):

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Wed Dec 14 16:47:25 2016 mstenber
-# Edit time:     29 min
+# Last modified: Thu Dec 15 07:44:33 2016 mstenber
+# Edit time:     32 min
 #
 """
 
@@ -143,7 +143,8 @@ class NamedLeafNode(DataMixin, btree.LeafNode):
                                _cbor_data=0x24))
 
     # Used to pickle _data
-    cbor_data_pickler = CBORPickler(dict(mode=0x31, foo=0x42))
+    cbor_data_pickler = CBORPickler(dict(mode=0x31, xattr=0x32,
+                                         foo=0x42))
     # 'foo' is used in tests only, as random metadata
 
     block_id = None
@@ -156,7 +157,7 @@ class NamedLeafNode(DataMixin, btree.LeafNode):
             self.block_id = block_id
 
     def perform_flush(self):
-        inode = self.forest.get_inode_by_leaf_node(self)
+        inode = self.forest.getdefault_inode_by_leaf_node(self)
         if inode:
             c = inode.node
             if c:

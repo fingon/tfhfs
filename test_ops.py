@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Tue Dec 13 21:05:52 2016 mstenber
-# Edit time:     71 min
+# Last modified: Thu Dec 15 07:38:38 2016 mstenber
+# Edit time:     78 min
 #
 """
 
@@ -125,6 +125,9 @@ def test_basic_file_io(oc):
     fd = oc.ops.open(attr.st_ino, 0, oc.rctx_root)
     assert isinstance(fd, int)
 
+    oc.ops.fsyncdir(llfuse.ROOT_INODE, False)
+    oc.ops.fsyncdir(llfuse.ROOT_INODE, True)
+
     oc.ops.fsync(fh, False)
     oc.ops.fsync(fh, True)
 
@@ -144,7 +147,7 @@ def test_basic_file_io(oc):
 
     oc.ops.release(fd)
 
-    oc.ops.forget((attr.st_ino, 1))
+    oc.ops.forget1(attr.st_ino)
 
 
 @pytest.mark.xfail(raises=llfuse.FUSEError)
@@ -161,16 +164,21 @@ def test_getattr(oc, inode, user_ctx):
     # TBD: Test more?
 
 
-@pytest.mark.xfail(raises=llfuse.FUSEError)
 def test_basic_xattr(oc):
     try:
         oc.ops.getxattr(llfuse.ROOT_INODE, b'foo', oc.rctx_root)
-        raise
+        assert False
     except llfuse.FUSEError as e:
         assert e.errno == errno.ENOATTR
+    assert list(oc.ops.listxattr(llfuse.ROOT_INODE, oc.rctx_root)) == []
+    oc.ops.setxattr(llfuse.ROOT_INODE, b'foo', b'bar', oc.rctx_root)
+    assert list(oc.ops.listxattr(llfuse.ROOT_INODE, oc.rctx_root)) == [b'foo']
+    oc.ops.getxattr(llfuse.ROOT_INODE, b'foo', oc.rctx_root) == b'bar'
 
 
 def test_ensure_full_implementation():
+    """ Make sure we implement all methids defined in llfuse.Operations in
+    ops.Opeartions. """
     ignored_always = {'__dict__', '__weakref__'}
     ignored_base = {'stacktrace',  # utility
                     } | ignored_always
