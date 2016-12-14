@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Wed Dec 14 09:52:35 2016 mstenber
-# Edit time:     30 min
+# Last modified: Thu Dec 15 06:31:45 2016 mstenber
+# Edit time:     32 min
 #
 """
 
@@ -31,6 +31,7 @@ INodes are assumed to be stored in a tree which looks like this:
 import logging
 
 from btree import LeafNode, TreeNode
+from forest_nodes import DirectoryEntry
 
 _debug = logging.getLogger(__name__).debug
 
@@ -133,6 +134,17 @@ class INode:
         self.refcnt -= count
         assert self.refcnt >= 0
         return self
+
+    @property
+    def direntry(self):
+        if self.leaf_node is not None:
+            return self.leaf_node
+        assert self.node is not None
+        n = self.node.search_name(b'')
+        if n is None:
+            n = DirectoryEntry(self.node.forest, name=b'')
+            self.node.add_child(n)
+        return n
 
     def ref(self, count=1):
         assert count > 0

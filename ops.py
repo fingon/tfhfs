@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Thu Dec 15 05:24:51 2016 mstenber
-# Edit time:     125 min
+# Last modified: Thu Dec 15 06:33:11 2016 mstenber
+# Edit time:     129 min
 #
 """
 
@@ -70,12 +70,7 @@ class Operations(llfuse.Operations):
         return entry
 
     def _inode_attributes(self, inode):
-        cn = inode.leaf_node
-        if cn is None:
-            entry = llfuse.EntryAttributes()
-            entry.st_ino = llfuse.ROOT_INODE
-            return entry
-        # non-root => LeafNode
+        cn = inode.direntry
         assert isinstance(cn, forest_nodes.DirectoryEntry)
         entry = self._leaf_attributes(cn)
         entry.st_ino = inode.value
@@ -217,7 +212,7 @@ class Operations(llfuse.Operations):
         pln = None
         for i, ln in enumerate(inode.node.get_leaves()):
             # Additions may screw up the tree bit
-            if pln is not None and pln.key > ln.key:
+            if (pln is not None and pln.key > ln.key) or not ln.name:
                 pass
             else:
                 pln = ln

@@ -9,14 +9,15 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Thu Dec 15 06:07:26 2016 mstenber
-# Edit time:     95 min
+# Last modified: Thu Dec 15 06:37:57 2016 mstenber
+# Edit time:     105 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
 
 """
 
+import contextlib
 import errno
 import logging
 import os
@@ -27,7 +28,7 @@ import const
 import forest
 import llfuse
 import ops
-from storage import DictStorage, NopBlockCodec, TypedBlockCodec
+from storage import DictStorage
 from util import to_bytes
 
 _debug = logging.getLogger(__name__).debug
@@ -149,11 +150,41 @@ class MockFS:
         self.ops.releasedir(fd)
         return l
 
+    def os_stat(self, path):
+        if path == '/':
+            path = b'.'
+        else:
+            assert '/' not in path
+            path = to_bytes(path)
+        inode = llfuse.ROOT_INODE
+        try:
+            attrs = self.ops.lookup(inode, path, self.rctx_user)
+        except llfuse.FUSEError:
+            raise FileNotFoundError
+        self.ops.forget([(attrs.st_ino, 1)])
+        return attrs
+
     def os_unlink(self, path):
         path = to_bytes(path)
         assert b'/' not in path
         inode = llfuse.ROOT_INODE
         self.ops.unlink(inode, path, self.rctx_user)
+
+
+def test_os_stat():
+    mfs = MockFS()
+    a = mfs.os_stat('/')
+    assert a.st_ino == llfuse.ROOT_INODE
+    assert mfs.os_listdir('/') == []  # should not be visible
+    with contextlib.suppress(FileNotFoundError):
+        a = mfs.os_stat('file')
+        assert False
+    assert a.st_ino
+    with mfs.open('file', 'w') as fh:
+        fh.write('foo')
+    a = mfs.os_stat('file')
+    assert a.st_ino
+    assert mfs.os_listdir('/') == ['file']
 
 
 @pytest.mark.timeout(2)
