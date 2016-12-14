@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Wed Dec 14 16:45:41 2016 mstenber
-# Edit time:     64 min
+# Last modified: Wed Dec 14 17:05:33 2016 mstenber
+# Edit time:     69 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -60,6 +60,10 @@ class MockFile:
 
     def flush(self):
         self.fs.ops.flush(self.fd)
+
+    @property
+    def inode(self):
+        return self.fs.forest.lookup_fd(self.fd).inode
 
     def read(self):
         r = self.fs.ops.read(self.fd, self.ofs, const.BLOCK_SIZE_LIMIT * 123)
@@ -162,21 +166,25 @@ def test_file_content(modesuffix, content, count):
     with mfs.open('file', 'w' + modesuffix) as fh:
         fh.write(content)
     # And read it back
+    _debug('read file')
     assert mfs.os_listdir('/') == ['file']
     with mfs.open('file', 'r' + modesuffix) as fh:
         got = fh.read()
         assert len(got) == len(content)
         assert got == content
+        assert fh.inode.size == len(content)
 
     mfs.forest.flush()
 
     # And read it back from storage too
     mfs2 = MockFS(storage=mfs.forest.storage)
     assert mfs2.os_listdir('/') == ['file']
+    _debug('read file (second storage)')
     with mfs2.open('file', 'r' + modesuffix) as fh:
         got = fh.read()
         assert len(got) == len(content)
         assert got == content
+        assert fh.inode.size == len(content)
 
     # And remove it
     mfs.os_unlink('file')

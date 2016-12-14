@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Wed Dec 14 10:08:50 2016 mstenber
-# Edit time:     143 min
+# Last modified: Wed Dec 14 17:48:14 2016 mstenber
+# Edit time:     190 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -49,6 +49,13 @@ import inode
 from forest_nodes import FileBlockEntry, FileBlockTreeNode, FileData
 
 _debug = logging.getLogger(__name__).debug
+
+
+def _zeropad(size, s=b''):
+    topad = size - len(s)
+    if topad > 0:
+        s = s + bytes([0] * topad)
+    return s
 
 
 class FDStore:
@@ -131,7 +138,7 @@ class FileINode(inode.INode):
     def open(self, flags):
         assert isinstance(self.store, FDStore)
         if flags & os.O_TRUNC:
-            self.trunc()
+            self.set_size(0)
         fd = self.store.allocate_fd()
         o = FileDescriptor(fd, self, flags)
         self.store.register_fd(fd, o)
@@ -163,13 +170,13 @@ class FileINode(inode.INode):
         else:
             assert isinstance(n, FileBlockTreeNode)
             n, _, d, ofs = self._tree_node_key_data_for_ofs(ofs, size)
-            if n is None and ofs < self.size:
+            fullsize = self.size
+            if n is None and oofs < fullsize:
                 pad = True
-                size = min(size, const.BLOCK_SIZE_LIMIT - ofs)
+                size = min(size, fullsize - oofs, const.BLOCK_SIZE_LIMIT - ofs)
         r = d and d[ofs:ofs + size] or b''
         if pad:
-            if len(r) < size:
-                r = r + bytes([0] * (size - len(r)))
+            r = _zeropad(size, r)
         _debug('read %d bytes from ofs %d/%d %s',
                len(r), oofs, ofs, pad and '(pad)' or '')
         return r
@@ -184,6 +191,8 @@ class FileINode(inode.INode):
             self._to_block_data(size)
         else:
             self._to_interned_data(size)
+        _debug('set size to %d', self.size)
+        assert self.size == size
 
     @property
     def size(self):
@@ -192,18 +201,22 @@ class FileINode(inode.INode):
             bd = self.leaf_node.block_data or b''
             return len(bd)
         if isinstance(n, FileData):
-            return len(n.data)
+            return len(n.content)
         try:
             ll = n.last_leaf
         except IndexError:
             return 0
         (ofs,) = struct.unpack('>I', ll.key)
-        return ofs * const.BLOCK_SIZE_LIMIT + len(ll.data)
-
-    def trunc(self):
-        self.set_size(0)
+        r = (ofs * const.BLOCK_SIZE_LIMIT) + len(ll.content)
+        _debug('size full %d, partial %s=%d => %d',
+               ofs, ll.key, len(ll.content), r)
+        return r
 
     def write(self, ofs, buf):
+        size = len(buf)
+        nsize = ofs + size
+        if self.size < nsize:
+            self.set_size(nsize)
         done = 0
         while done < len(buf):
             wrote = self._write(ofs + done, buf[done:])
@@ -214,9 +227,6 @@ class FileINode(inode.INode):
     def _write(self, ofs, buf):
         _debug('_write @%d %s', ofs, len(buf))
         size = len(buf)
-        nsize = ofs + size
-        if self.size < nsize:
-            self.set_size(nsize)
 
         def _replace(s, ofs, buf, bufofs, bufmax):
             if s is None:
@@ -225,10 +235,11 @@ class FileINode(inode.INode):
             bufmax = bufmax or len(buf)
             ns = buf[bufofs:bufofs + bufmax]
             rofs = ofs + len(ns)
-            _debug('xxx %s: %d/%d = %s', s, ofs, rofs, ns)
-            rs = s[:ofs] + ns + s[rofs:]
+            _debug('_replace %d: %d/%d = %d', len(s), ofs, rofs, len(ns))
+            rs = _zeropad(ofs, s[:ofs]) + ns + s[rofs:]
             ofs += len(ns)
             bufofs += len(ns)
+            _debug(' => %d', len(rs))
             return rs, bufofs
 
         ln = self.leaf_node
@@ -240,8 +251,11 @@ class FileINode(inode.INode):
             s, bufofs = _replace(n.content, ofs, buf, 0, 0)
             self.set_node(FileData(self.store, None, s))
         else:
+            _debug('@%d %d', ofs, size)
             cn, k, d, ofs = self._tree_node_key_data_for_ofs(ofs, size)
-            s, bufofs = _replace(d, ofs, buf, 0, const.BLOCK_SIZE_LIMIT - ofs)
+            _debug('@%d (d=%d)', ofs, len(d))
+            s, bufofs = _replace(d, ofs, buf, 0,
+                                 min(size, const.BLOCK_SIZE_LIMIT - ofs))
             # If the child node does not exist, create it and add to tree
             if not cn:
                 cn = FileBlockEntry(self.store, name=k)
@@ -249,7 +263,7 @@ class FileINode(inode.INode):
             bid = self.store.refer_or_store_block_by_data(s)
             cn.set_block_id(bid)
             self.store.storage.release_block(bid)
-        _debug(' = %d bytes written', bufofs)
+        _debug(' = %d bytes written (result len %d)', bufofs, len(s))
         return bufofs
 
     def _to_block_tree(self, size):
@@ -265,7 +279,7 @@ class FileINode(inode.INode):
             n._loaded = True
             self.set_node(n)
             self.write(0, buf)
-        self.write(size, b'')
+        self._write(size, b'')
 
     def _to_block_data(self, size):
         _debug('_to_block_data %d', size)
@@ -285,24 +299,18 @@ class FileINode(inode.INode):
     def _tree_node_key_data_for_ofs(self, ofs, size):
         n = self.load_node()
         assert isinstance(n, FileBlockTreeNode)
-        oofs = ofs
         k, ofs, size = self._tree_key_for_ofs(ofs, size)
         n = n.search_name(k)
         if n:
             d = n.content
         else:
-            # If it is beyond end, return empty
-            if oofs > self.size:
-                return n, k, b'', 0
-            # Non-first nodes are implicitly all zeroes
-            d = bytes([0] * size)
-            ofs = 0
+            # Non-last nodes are implicitly all zeroes
+            d = _zeropad(size)
         return n, k, d, ofs
 
     def _tree_key_for_ofs(self, ofs, size):
         kn = ofs // const.BLOCK_SIZE_LIMIT
         ofs -= kn * const.BLOCK_SIZE_LIMIT
         k = struct.pack('>I', kn)
-        size = const.BLOCK_SIZE_LIMIT - ofs
-        assert size > 0
+        size = min(size, const.BLOCK_SIZE_LIMIT - ofs)
         return k, ofs, size
