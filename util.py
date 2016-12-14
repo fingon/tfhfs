@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:06:01 2016 mstenber
-# Last modified: Thu Dec 15 07:41:55 2016 mstenber
-# Edit time:     12 min
+# Last modified: Thu Dec 15 08:11:28 2016 mstenber
+# Edit time:     13 min
 #
 """
 
@@ -95,6 +95,10 @@ class DataMixin(DirtyMixin):
         if self._data is None:
             self._data = {}
         return self._data
+
+    @property
+    def nonempty_data(self):
+        return {k: v for k, v in self.data.items() if v}
 
     def set_data(self, k, v):
         assert (not self.cbor_data_pickler
