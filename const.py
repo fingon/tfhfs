@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jul  2 21:10:04 2016 mstenber
-# Last modified: Wed Dec 14 06:02:43 2016 mstenber
+# Last modified: Thu Dec 15 08:05:42 2016 mstenber
 # Edit time:     8 min
 #
 """
@@ -44,3 +44,10 @@ INTERNED_BLOCK_DATA_SIZE_LIMIT = 128
 
 # how large blocks we want to have (=normal FileData block maximum size)
 BLOCK_SIZE_LIMIT = 128000
+
+# llfuse.EntryAttributes reflection stuff
+ATTR_STAT_KEYS = ['st_atime_ns', 'st_blksize', 'st_blocks', 'st_ctime_ns',
+                  'st_gid', 'st_ino', 'st_mode',
+                  'st_mtime_ns', 'st_nlink',
+                  'st_rdev', 'st_size', 'st_uid']
+ATTR_KEYS = ['attr_timeout', 'entry_timeout', 'generation'] + ATTR_STAT_KEYS

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Thu Dec 15 07:54:13 2016 mstenber
-# Edit time:     79 min
+# Last modified: Thu Dec 15 08:06:50 2016 mstenber
+# Edit time:     88 min
 #
 """
 
@@ -28,6 +28,7 @@ import os
 
 import pytest
 
+import const
 import forest
 import llfuse
 import ops
@@ -78,6 +79,28 @@ def oc():
     r = OpsContext()
     yield r
     r.ops.destroy()
+
+
+def attr_to_dict(a):
+    assert isinstance(a, llfuse.EntryAttributes)
+    return {k: getattr(a, k) for k in const.ATTR_KEYS}
+
+
+def attr_equal(a1, a2):
+    a1 = attr_to_dict(a1)
+    a2 = attr_to_dict(a2)
+    return a1 == a2
+
+
+def test_lookup(oc):
+    a = oc.ops.lookup(llfuse.ROOT_INODE, b'.', oc.rctx_root)
+    a2 = oc.ops.lookup(llfuse.ROOT_INODE, b'..', oc.rctx_root)
+    assert attr_equal(a, a2)
+    a3 = oc.ops.lookup(oc.inodes[b'user_dir'], b'..', oc.rctx_root)
+    assert attr_equal(a, a3)
+    a4 = oc.ops.lookup(oc.inodes[b'user_dir'], b'.', oc.rctx_root)
+    assert not attr_equal(a, a4)
+    oc.ops.forget([(a4.st_ino, 1), (a.st_ino, 3)])
 
 
 @pytest.mark.xfail(raises=llfuse.FUSEError)

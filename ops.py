@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Thu Dec 15 07:55:35 2016 mstenber
-# Edit time:     145 min
+# Last modified: Thu Dec 15 08:07:23 2016 mstenber
+# Edit time:     148 min
 #
 """
 
@@ -168,9 +168,7 @@ class Operations(llfuse.Operations):
         elif name == b'..':
             cn = n.leaf_node
             if cn:
-                gp_inode = self.forest.getdefault_inode_by_parent(cn.root)
-                if gp_inode:
-                    return self.lookup(gp_inode.value, b'.', ctx)
+                n = self.forest.getdefault_inode_by_node(cn.root)
         else:
             n = self.forest.lookup(n, name)
             assert_or_errno(n, ENOENT)

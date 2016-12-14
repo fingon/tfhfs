@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Thu Dec 15 07:44:33 2016 mstenber
-# Edit time:     32 min
+# Last modified: Thu Dec 15 08:08:48 2016 mstenber
+# Edit time:     33 min
 #
 """
 
@@ -143,8 +143,11 @@ class NamedLeafNode(DataMixin, btree.LeafNode):
                                _cbor_data=0x24))
 
     # Used to pickle _data
-    cbor_data_pickler = CBORPickler(dict(mode=0x31, xattr=0x32,
-                                         foo=0x42))
+    cbor_data_pickler_dict = dict(mode=0x31, xattr=0x32, foo=0x42)
+    for v, k in enumerate(const.ATTR_STAT_KEYS, 0x50):
+        cbor_data_pickler_dict[k] = v
+
+    cbor_data_pickler = CBORPickler(cbor_data_pickler_dict)
     # 'foo' is used in tests only, as random metadata
 
     block_id = None

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Jul  5 11:49:58 2016 mstenber
-# Last modified: Thu Dec 15 07:45:16 2016 mstenber
-# Edit time:     68 min
+# Last modified: Thu Dec 15 08:11:44 2016 mstenber
+# Edit time:     70 min
 #
 """
 
@@ -58,7 +58,7 @@ def testforest():
     f2c = f2.lookup(f2.root, b'foo')
     f2c2 = f2.lookup(f2.root, b'foo')
     assert f2c is f2c2
-    assert f2c and f2c.leaf_node.data == dict(foo=42, mode=0, xattr=None)
+    assert f2c and f2c.leaf_node.nonempty_data == dict(foo=42)
     assert not f2.root.node.dirty
 
     # add a directory
