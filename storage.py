@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Tue Dec 13 07:56:38 2016 mstenber
-# Edit time:     367 min
+# Last modified: Wed Dec 14 09:12:34 2016 mstenber
+# Edit time:     373 min
 #
 """This is the 'storage layer' main module.
 
@@ -325,6 +325,39 @@ class ReferringStorage(Storage):
         self.block_id_has_references_callback = callback
         if callback is None:
             del self.block_id_has_references_callback
+
+
+class DictStorage(ReferringStorage):
+    """ For testing purposes, in-memory dict-based storage. """
+
+    def __init__(self, **kw):
+        ReferringStorage.__init__(self, **kw)
+        self.name2bid = {}
+        self.bid2datarefcnt = {}
+
+    def delete_block_id(self, block_id):
+        del self.bid2datarefcnt[block_id]
+
+    def get_block_by_id(self, block_id):
+        return self.bid2datarefcnt.get(block_id)
+
+    def get_block_id_by_name(self, n):
+        return self.name2bid.get(n)
+
+    def set_block_name_raw(self, block_id, n):
+        if block_id:
+            self.name2bid[n] = block_id
+        else:
+            del self.name2bid[n]
+
+    def set_block_refcnt(self, block_id, refcnt):
+        self.bid2datarefcnt[block_id][1] = refcnt
+        if refcnt:
+            return
+        self.delete_block_id_if_no_extref(block_id)
+
+    def store_block(self, block_id, block_data, *, refcnt=1):
+        self.bid2datarefcnt[block_id] = [block_data, refcnt]
 
 
 class SQLiteStorage(ReferringStorage):

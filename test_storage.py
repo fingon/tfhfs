@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Tue Dec 13 07:57:22 2016 mstenber
-# Edit time:     129 min
+# Last modified: Wed Dec 14 09:13:38 2016 mstenber
+# Edit time:     130 min
 #
 """
 
@@ -24,7 +24,7 @@ import cryptography.exceptions
 import pytest
 
 from storage import (CompressingTypedBlockCodec, ConfidentialBlockCodec,
-                     DelayedStorage, NopBlockCodec, SQLiteStorage,
+                     DelayedStorage, DictStorage, NopBlockCodec, SQLiteStorage,
                      TypedBlockCodec)
 
 _debug = logging.getLogger(__name__).debug
@@ -248,15 +248,19 @@ def test_sqlitestorage_get_execute_error(kwargs):
     s._get_execute_result('BLORB', **kwargs)
 
 
-@pytest.mark.parametrize('storage_attrs, use_flush',
+@pytest.mark.parametrize('storage_attrs, use_flush, backend',
                          [
-                             ({}, True),
-                             ({'maximum_cache_size': 1}, True),  # no cache
-                             ({'maximum_dirty_size': 1},  True),  # no dirty
-                             ({}, False),
+                             ({}, True, SQLiteStorage),
+                             ({}, True, DictStorage),
+                             ({'maximum_cache_size': 1}, True,
+                              DictStorage),  # no cache
+                             ({'maximum_dirty_size': 1},  True,
+                              DictStorage
+                              ),  # no dirty
+                             ({}, False, DictStorage),
                          ])
-def test_delayedstorage(storage_attrs, use_flush):
-    s2 = SQLiteStorage()
+def test_delayedstorage(storage_attrs, use_flush, backend):
+    s2 = backend()
     s = DelayedStorage(s2)
     for k, v in storage_attrs.items():
         setattr(s, k, v)
