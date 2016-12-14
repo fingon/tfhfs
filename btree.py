@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 15:36:58 2016 mstenber
-# Last modified: Tue Dec  6 21:10:56 2016 mstenber
-# Edit time:     292 min
+# Last modified: Wed Dec 14 08:52:45 2016 mstenber
+# Edit time:     294 min
 #
 """This is the 'btree' module.
 
@@ -21,6 +21,7 @@ It implements abstract COW-friendly B+ trees.
 import bisect
 import logging
 
+import const
 import mmh3
 from ms.lazy import lazy_property
 
@@ -71,7 +72,7 @@ class TreeNode(Node):
     """ A class which represents a single intermediate or root tree
 node. """
 
-    maximum_size = 128000
+    maximum_size = const.BLOCK_SIZE_LIMIT
     minimum_size = maximum_size * 1 / 4
     has_spares_size = maximum_size / 2
 
@@ -175,6 +176,20 @@ node. """
         if self.is_leafy:
             return 1
         return self.children[0].depth + 1
+
+    @property
+    def first_leaf(self):
+        n = self.children[0]
+        if isinstance(n, TreeNode):
+            return n.first_leaf
+        return n
+
+    @property
+    def last_leaf(self):
+        n = self.children[-1]
+        if isinstance(n, TreeNode):
+            return n.last_leaf
+        return n
 
     def get_leaves(self):
         for child in self.children:

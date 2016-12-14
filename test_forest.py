@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # -*- Python -*-
 #
-# $Id: test_forest.py $
+# $Id: testforest.py $
 #
 # Author: Markus Stenberg <fingon@iki.fi>
 #
@@ -32,7 +32,7 @@ class LeafierDirectoryTreeNode(forest.DirectoryTreeNode):
     has_spares_size = maximum_size / 2
 
 
-def test_forest():
+def testforest():
     storage = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
     f = forest.Forest(storage, 42)
     root = f.get_inode_by_value(42)
@@ -65,9 +65,9 @@ def test_forest():
     dir_inode = f.create_dir(f.root, name=b'bar')
     subdir = dir_inode.leaf_node
     assert f.root.node.dirty
-    assert not dir_inode.node._block_id
+    assert not dir_inode.node.block_id
     f.flush()
-    assert dir_inode.node._block_id
+    assert dir_inode.node.block_id
     assert not f.flush()
 
     # Ensure that changing things _within the directory_ also makes
@@ -76,14 +76,14 @@ def test_forest():
     assert subdir.dirty
     # assert f.root.dirty # n/a; the dirtiness is propagated during flush
 
-    old_root_block_id = root.node._block_id
+    old_root_block_id = root.node.block_id
     assert old_root_block_id
     assert f.flush()
-    assert root.node._block_id != old_root_block_id
+    assert root.node.block_id != old_root_block_id
     assert not f.flush()
 
 
-def test_deep_forest():
+def test_deepforest():
     storage = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
     f = forest.Forest(storage, 42)
     parent_inode = f.root
@@ -104,7 +104,7 @@ def test_deep_forest():
     assert parent_inode.leaf_node.data['foo'] == 42
 
 
-def test_wide_forest():
+def test_wideforest():
     storage = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
     f = forest.Forest(storage, 42)
     f.directory_node_class = LeafierDirectoryTreeNode

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Sat Dec  3 17:55:51 2016 mstenber
-# Edit time:     26 min
+# Last modified: Wed Dec 14 09:52:35 2016 mstenber
+# Edit time:     30 min
 #
 """
 
@@ -151,11 +151,15 @@ class INode:
         self.store._unregister_inode(self)
 
     def set_node(self, node):
-        assert isinstance(node, TreeNode)
         if self.node is node:
             return
-        _debug('%s replacing node -> %s' % (self, node))
+        _debug('%s node = %s' % (self, node))
         assert node not in self.store._node2inode
-        del self.store._node2inode[self.node]
+        if self.node:
+            del self.store._node2inode[self.node]
         self.node = node
-        self.store._node2inode[self.node] = self
+        if self.node:
+            self.store._node2inode[self.node] = self
+        if self.leaf_node:
+            # The node we are associated is dirty .. by association.
+            self.leaf_node.mark_dirty()

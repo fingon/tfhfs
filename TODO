@@ -18,6 +18,13 @@ Options for a file:
 
 - tree of data blocks
 
+*** Check/test
+
+**** Truncation
+**** Insertion to various places
+**** Reading in clever and unexpected ways
+
+
 ** Add missing functionality to forest module (e.g. remove API?)
 
 ** Write more thorough filesystem tests to test_ops or elsewhere
@@ -73,3 +80,5 @@ multiple writers are present, no cleanups.
 
 Electing the cleaner to be the one with most in-memory references seems
 sensible but possibly minor optimization.
+
+** Rethink if inodestore <> forest abstraction is good

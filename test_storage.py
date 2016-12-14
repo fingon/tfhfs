@@ -193,21 +193,21 @@ class ConfidentialBlockCodecTests(unittest.TestCase):
         self.cbc = ConfidentialBlockCodec(self.password)
         self.ciphertext = self.cbc.encode_block(self.block_id, self.plaintext)
 
-    def test_confidentialblockcodec(self):
+    def test_confidential_blockcodec(self):
         plaintext = self.cbc.decode_block(self.block_id, self.ciphertext)
         assert plaintext == self.plaintext
 
     @pytest.mark.xfail(raises=cryptography.exceptions.InvalidTag)
-    def test_confidentialblockcodec_decode_error_1(self):
+    def test_confidential_blockcodec_decode_error_1(self):
         self.cbc.decode_block(self.block_id + b'42', self.ciphertext)
 
     @pytest.mark.xfail(raises=cryptography.exceptions.InvalidTag)
-    def test_confidentialblockcodec_decode_error_1(self):
+    def test_confidential_blockcodec_decode_error_1(self):
         s = self.ciphertext + b'42'  # 'flawed' input -> cannot pass check
         self.cbc.decode_block(self.block_id, s)
 
     @pytest.mark.xfail(raises=AssertionError)
-    def test_confidentialblockcodec_decode_error_2(self):
+    def test_confidential_blockcodec_decode_error_2(self):
         self.cbc.decode_block(self.block_id, b'x')
 
 

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Tue Dec 13 21:07:27 2016 mstenber
-# Edit time:     548 min
+# Last modified: Wed Dec 14 10:06:19 2016 mstenber
+# Edit time:     551 min
 #
 """This is the 'forest layer' main module.
 
@@ -43,7 +43,7 @@ import logging
 import const
 import inode
 from forest_file import FDStore, FileINode
-from forest_nodes import DirectoryTreeNode, FileBlockTreeNode
+from forest_nodes import DirectoryTreeNode, FileBlockTreeNode, FileData
 
 _debug = logging.getLogger(__name__).debug
 
@@ -125,8 +125,8 @@ class Forest(inode.INodeStore, FDStore):
         # - gets back up the tree with fresh block ids.
         rv = self.root.node.flush()
         if rv:
-            _debug(' new content_id %s', self.root.node._block_id)
-            self.storage.set_block_name(self.root.node._block_id, CONTENT_NAME)
+            _debug(' new content_id %s', self.root.node.block_id)
+            self.storage.set_block_name(self.root.node.block_id, CONTENT_NAME)
 
         # Now that the tree is no longer dirty, we can kill inodes
         # that have no reference (TBD: This could also depend on some
@@ -141,7 +141,7 @@ class Forest(inode.INodeStore, FDStore):
         # common occurence (assume read-heavy workloads). This could
         # use a lazy property of some kind, perhaps..
         for node in self._node2inode.keys():
-            if node._block_id == block_id:
+            if node.block_id == block_id:
                 return True
 
     def lookup(self, dir_inode, name):
@@ -153,7 +153,7 @@ class Forest(inode.INodeStore, FDStore):
             if child_inode is None:
                 if n.is_dir:
                     cn = self.directory_node_class(forest=self,
-                                                   block_id=n._block_id)
+                                                   block_id=n.block_id)
                     cl = None
                 else:
                     cn = None
@@ -162,3 +162,8 @@ class Forest(inode.INodeStore, FDStore):
             else:
                 child_inode.ref()
             return child_inode
+
+    def refer_or_store_block_by_data(self, d):
+        n = FileData(self, None, d)
+        n.perform_flush(in_inode=False)
+        return n.block_id

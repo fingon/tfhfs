@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Tue Dec 13 20:14:35 2016 mstenber
-# Edit time:     39 min
+# Last modified: Wed Dec 14 10:10:21 2016 mstenber
+# Edit time:     60 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -23,13 +23,16 @@ import os
 
 import pytest
 
+import const
 import forest
 import llfuse
 import ops
-from storage import NopBlockCodec, SQLiteStorage, TypedBlockCodec
+from storage import DictStorage, NopBlockCodec, TypedBlockCodec
 from util import to_bytes
 
 _debug = logging.getLogger(__name__).debug
+
+O_BINARY = os.O_DIRECTORY  # reuse :p
 
 
 class MockFile:
@@ -59,22 +62,29 @@ class MockFile:
         self.fs.ops.flush(self.fd)
 
     def read(self):
-        raise NotImplementedError
+        r = self.fs.ops.read(self.fd, self.ofs, const.BLOCK_SIZE_LIMIT * 123)
+        self.ofs += len(r)
+        if not (self.flags & O_BINARY):
+            r = r.decode()
+        return r
 
     def seek(self, ofs):
         self.ofs = ofs
 
     def write(self, s):
+        if not (self.flags & O_BINARY):
+            s = to_bytes(s)
         if not (self.flags & (os.O_RDWR | os.O_WRONLY)):
             raise IOError
-        # TBD: O_APPEND = write always to the end
-        pass
+        r = self.fs.ops.write(self.fd, self.ofs, s)
+        self.ofs += r
+        return r
 
 
 class MockFS:
 
     def __init__(self):
-        storage = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
+        storage = DictStorage()
         f = forest.Forest(storage, llfuse.ROOT_INODE)
         self.ops = ops.Operations(f)
         self.rctx_root = llfuse.RequestContext()
@@ -88,7 +98,8 @@ class MockFS:
         char2flag = {'r': (os.O_RDONLY, 0),
                      'w': (os.O_WRONLY, 0),
                      '+': (os.O_RDWR, os.O_RDONLY | os.O_WRONLY),
-                     'a': (os.O_WRONLY | os.O_APPEND, 0)}
+                     'a': (os.O_WRONLY | os.O_APPEND, 0),
+                     'b': (O_BINARY, 0)}
         for char in mode:
             setbits, clearbits = char2flag[char]
             flags |= setbits
@@ -133,12 +144,26 @@ class MockFS:
         self.ops.unlink(inode, path, self.rctx_user)
 
 
-def test_simple():
+@pytest.mark.timeout(2)
+@pytest.mark.parametrize('modesuffix,content,count', [
+    ('', 'foo', 1),
+    ('b', b'foo', 1),
+    ('', '1', const.INTERNED_BLOCK_DATA_SIZE_LIMIT + 1),
+    ('b', b'2', const.INTERNED_BLOCK_DATA_SIZE_LIMIT + 2),
+    ('', '3', const.BLOCK_SIZE_LIMIT + 3),
+    ('b', b'4', 3 * const.BLOCK_SIZE_LIMIT + 4),
+])
+def test_file_content(modesuffix, content, count):
+    content = content * count
     mfs = MockFS()
     assert mfs.os_listdir('/') == []
-    with mfs.open('file', 'w') as fh:
-        fh.write('foo')
+    with mfs.open('file', 'w' + modesuffix) as fh:
+        fh.write(content)
     assert mfs.os_listdir('/') == ['file']
+    with mfs.open('file', 'r' + modesuffix) as fh:
+        got = fh.read()
+        assert len(got) == len(content)
+        assert got == content
     mfs.os_unlink('file')
     assert mfs.os_listdir('/') == []
 

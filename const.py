@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jul  2 21:10:04 2016 mstenber
-# Last modified: Sat Dec  3 17:33:40 2016 mstenber
-# Edit time:     6 min
+# Last modified: Wed Dec 14 06:02:43 2016 mstenber
+# Edit time:     8 min
 #
 """
 
@@ -38,3 +38,9 @@ BIT_COMPRESSED = 0x80  # compression was applied to the block
 
 DENTRY_MODE_DIR = 0o1000
 DENTRY_MODE_MINIFILE = 0o2000  # single data block; no underlying tree
+
+# how much data we intern inside DirectoryEntries
+INTERNED_BLOCK_DATA_SIZE_LIMIT = 128
+
+# how large blocks we want to have (=normal FileData block maximum size)
+BLOCK_SIZE_LIMIT = 128000

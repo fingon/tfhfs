@@ -2,3 +2,4 @@ pytest
 pytest-catchlog
 pytest-sugar
 pytest-xdist
+pytest-timeout
