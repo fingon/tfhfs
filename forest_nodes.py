@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Wed Dec 14 10:12:43 2016 mstenber
+# Last modified: Wed Dec 14 16:47:25 2016 mstenber
 # Edit time:     29 min
 #
 """
@@ -229,6 +229,8 @@ class FileData(DirtyMixin):
         self.forest = forest
         self.block_id = block_id
         self.block_data = block_data
+        if block_data:
+            self.mark_dirty()
 
     @property
     def content(self):

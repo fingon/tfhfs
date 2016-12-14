@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Wed Dec 14 10:10:21 2016 mstenber
-# Edit time:     60 min
+# Last modified: Wed Dec 14 16:45:41 2016 mstenber
+# Edit time:     64 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -83,10 +83,10 @@ class MockFile:
 
 class MockFS:
 
-    def __init__(self):
-        storage = DictStorage()
-        f = forest.Forest(storage, llfuse.ROOT_INODE)
-        self.ops = ops.Operations(f)
+    def __init__(self, *, storage=None):
+        storage = storage or DictStorage()
+        self.forest = forest.Forest(storage, llfuse.ROOT_INODE)
+        self.ops = ops.Operations(self.forest)
         self.rctx_root = llfuse.RequestContext()
         self.rctx_user = llfuse.RequestContext(uid=42, gid=7, pid=123)
         self.ops.init()
@@ -156,14 +156,29 @@ class MockFS:
 def test_file_content(modesuffix, content, count):
     content = content * count
     mfs = MockFS()
+    # Ensure empty instance is empty
     assert mfs.os_listdir('/') == []
+    # And we can write file
     with mfs.open('file', 'w' + modesuffix) as fh:
         fh.write(content)
+    # And read it back
     assert mfs.os_listdir('/') == ['file']
     with mfs.open('file', 'r' + modesuffix) as fh:
         got = fh.read()
         assert len(got) == len(content)
         assert got == content
+
+    mfs.forest.flush()
+
+    # And read it back from storage too
+    mfs2 = MockFS(storage=mfs.forest.storage)
+    assert mfs2.os_listdir('/') == ['file']
+    with mfs2.open('file', 'r' + modesuffix) as fh:
+        got = fh.read()
+        assert len(got) == len(content)
+        assert got == content
+
+    # And remove it
     mfs.os_unlink('file')
     assert mfs.os_listdir('/') == []
 
