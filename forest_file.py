@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Wed Dec 14 17:48:14 2016 mstenber
-# Edit time:     190 min
+# Last modified: Thu Dec 15 06:09:33 2016 mstenber
+# Edit time:     204 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -109,7 +109,7 @@ class FileDescriptor:
         del self.inode
 
     def dup(self):
-        fd2 = self.inode.open(self.flags)
+        fd2 = self.inode.open(self.flags & ~os.O_TRUNC)
         return fd2
 
     def read(self, ofs, size):
@@ -170,10 +170,9 @@ class FileINode(inode.INode):
         else:
             assert isinstance(n, FileBlockTreeNode)
             n, _, d, ofs = self._tree_node_key_data_for_ofs(ofs, size)
-            fullsize = self.size
-            if n is None and oofs < fullsize:
-                pad = True
-                size = min(size, fullsize - oofs, const.BLOCK_SIZE_LIMIT - ofs)
+            pad = True
+            size = int(min(size, self.size - oofs,
+                           const.BLOCK_SIZE_LIMIT - ofs))
         r = d and d[ofs:ofs + size] or b''
         if pad:
             r = _zeropad(size, r)
@@ -251,9 +250,8 @@ class FileINode(inode.INode):
             s, bufofs = _replace(n.content, ofs, buf, 0, 0)
             self.set_node(FileData(self.store, None, s))
         else:
-            _debug('@%d %d', ofs, size)
+            _debug(' tree @%d %d', ofs, size)
             cn, k, d, ofs = self._tree_node_key_data_for_ofs(ofs, size)
-            _debug('@%d (d=%d)', ofs, len(d))
             s, bufofs = _replace(d, ofs, buf, 0,
                                  min(size, const.BLOCK_SIZE_LIMIT - ofs))
             # If the child node does not exist, create it and add to tree
@@ -278,7 +276,7 @@ class FileINode(inode.INode):
             n = FileBlockTreeNode(self.store)
             n._loaded = True
             self.set_node(n)
-            self.write(0, buf)
+            self._write(0, buf)  # no resize
         self._write(size, b'')
 
     def _to_block_data(self, size):
@@ -311,6 +309,9 @@ class FileINode(inode.INode):
     def _tree_key_for_ofs(self, ofs, size):
         kn = ofs // const.BLOCK_SIZE_LIMIT
         ofs -= kn * const.BLOCK_SIZE_LIMIT
-        k = struct.pack('>I', kn)
+        ofs = int(ofs)
+        _debug(' => block#%d ofs#%d', kn, ofs)
+        k = struct.pack('>I', int(kn))
         size = min(size, const.BLOCK_SIZE_LIMIT - ofs)
+        _debug(' => size %d', size)
         return k, ofs, size

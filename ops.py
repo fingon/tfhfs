@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Tue Dec 13 21:08:34 2016 mstenber
-# Edit time:     121 min
+# Last modified: Thu Dec 15 05:24:51 2016 mstenber
+# Edit time:     125 min
 #
 """
 
@@ -36,11 +36,14 @@ http://pythonhosted.org/llfuse/fuse_api.html
 
 """
 
+import logging
 import os
 from errno import EEXIST, ENOATTR, ENOENT, ENOSYS, ENOTEMPTY
 
 import forest_nodes
 import llfuse
+
+_debug = logging.getLogger(__name__).debug
 
 
 def assert_or_errno(stmt, err):
@@ -102,6 +105,8 @@ class Operations(llfuse.Operations):
 
     def create(self, parent_inode, name, mode, flags, ctx):
         assert self._initialized
+        _debug('create @i:%s %s m%o f:0x%x %s',
+               parent_inode, name, mode, flags, ctx)
         n = self.forest.getdefault_inode_by_value(parent_inode)
         assert_or_errno(n, ENOENT)
         file_inode = self.forest.lookup(n, name)
@@ -189,6 +194,7 @@ class Operations(llfuse.Operations):
 
     def open(self, inode, flags, ctx):
         assert self._initialized
+        _debug('open i:%d f:0x%x %s', inode, flags, ctx)
         inode = self.forest.getdefault_inode_by_value(inode)
         assert_or_errno(inode, ENOENT)
         return inode.open(flags)

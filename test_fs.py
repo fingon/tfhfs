@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Wed Dec 14 17:05:33 2016 mstenber
-# Edit time:     69 min
+# Last modified: Thu Dec 15 06:07:26 2016 mstenber
+# Edit time:     95 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -65,8 +65,8 @@ class MockFile:
     def inode(self):
         return self.fs.forest.lookup_fd(self.fd).inode
 
-    def read(self):
-        r = self.fs.ops.read(self.fd, self.ofs, const.BLOCK_SIZE_LIMIT * 123)
+    def read(self, count=const.BLOCK_SIZE_LIMIT * 123):
+        r = self.fs.ops.read(self.fd, self.ofs, count)
         self.ofs += len(r)
         if not (self.flags & O_BINARY):
             r = r.decode()
@@ -100,28 +100,36 @@ class MockFS:
         assert b'/' not in filename
         flags = 0
         char2flag = {'r': (os.O_RDONLY, 0),
-                     'w': (os.O_WRONLY, 0),
+                     'w': (os.O_WRONLY | os.O_TRUNC | os.O_CREAT, 0),
                      '+': (os.O_RDWR, os.O_RDONLY | os.O_WRONLY),
-                     'a': (os.O_WRONLY | os.O_APPEND, 0),
+                     'a': (os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0),
                      'b': (O_BINARY, 0)}
         for char in mode:
             setbits, clearbits = char2flag[char]
             flags |= setbits
             flags &= ~clearbits
+        fd = None
         try:
             _debug('attempting to lookup %s', filename)
             attrs = self.ops.lookup(llfuse.ROOT_INODE, filename,
                                     self.rctx_user)
-            fd = self.ops.open(attrs.st_ino, flags, self.rctx_user)
-            self.ops.forget([(attrs.st_ino, 1)])
+            if flags & (os.O_CREAT | os.O_EXCL) == (os.O_CREAT | os.O_EXCL):
+                if attrs:
+                    self.ops.forget([(attrs.st_ino, 1)])
+                    raise IOError
+            else:
+                fd = self.ops.open(attrs.st_ino, flags, self.rctx_user)
+                self.ops.forget([(attrs.st_ino, 1)])
         except llfuse.FUSEError as e:
             _debug('exception %s', repr(e))
+        if fd is None:
+            if not (flags & os.O_CREAT):
+                raise IOError(errno.ENOENT)
             if not (flags & (os.O_WRONLY | os.O_RDWR)):
                 raise IOError(errno.ENOENT)
-            mode = 0
-            cr_flags = 0
+            mode = 0  # TBD
             fd, attrs = self.ops.create(llfuse.ROOT_INODE, filename,
-                                        mode, cr_flags, self.rctx_user)
+                                        mode, flags, self.rctx_user)
         return MockFile(self, fd, flags)
 
     def os_close(self, fd):
@@ -207,3 +215,24 @@ def test_unlink_behavior():
         mfs.os_close(mfs.os_dup(fh1.fileno()))
         fh1.seek(0)
         assert fh1.read() == 'foobar'
+
+
+def test_huge_file():
+    """ Test that a HUGE(tm) file reads out all zeroes (and this will not end in tears) """
+    hugefilesize = 1e12 + 42  # 1 terabyte
+    middlish = hugefilesize // 2 + 13
+    mfs = MockFS()
+    with mfs.open('file', 'wb') as f:
+        f.write(b'a')
+        f.seek(middlish)
+        f.write(b'b')
+        f.seek(hugefilesize)
+        f.write(b'c')
+    with mfs.open('file', 'rb') as f:
+        assert f.inode.size == hugefilesize + 1
+        cnt = 1000
+        assert f.read(cnt) == b'a' + bytes([0] * (cnt - 1))
+        f.seek(middlish)
+        assert f.read(cnt) == b'b' + bytes([0] * (cnt - 1))
+        f.seek(hugefilesize)
+        assert f.read() == b'c'

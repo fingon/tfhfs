@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 16:29:53 2016 mstenber
-# Last modified: Tue Dec  6 21:10:33 2016 mstenber
-# Edit time:     34 min
+# Last modified: Thu Dec 15 05:05:49 2016 mstenber
+# Edit time:     42 min
 #
 """
 
@@ -18,6 +18,8 @@
 
 import logging
 import random
+
+import pytest
 
 import btree
 
@@ -64,19 +66,25 @@ class LeafierTreeNode(btree.TreeNode):
     has_spares_size = maximum_size / 2
 
 
-def test_large_tree():
+@pytest.mark.parametrize('hashleaf', [False, True])
+def test_large_tree(hashleaf):
     root = LeafierTreeNode()
     nodes = []
+    cl = hashleaf and btree.LeafNode or NoHashLeafNode
     for i in range(1000):
+        # all rebalancing options NOT covered: 100
+        # all rebalancing options covered: 1000
+        # (oh well, few seconds of CPU, who cares?)
         name = b'%04d' % i
-        n = btree.LeafNode(name)
+        n = cl(name)
         n.i = i
         nodes.append(n)
+    last_leaf_name = name
     random.shuffle(nodes)
     for i, n in enumerate(nodes):
         _debug('add #%d: %s', i, n)
         root = root.add(n)
-        n2 = btree.LeafNode(n.name)
+        n2 = cl(n.name)
         # Ensure add result looks sane
         assert root.search(n2) is n
     assert len(list(root.get_leaves())) == len(nodes)
@@ -85,8 +93,12 @@ def test_large_tree():
     # Then, with the fully formed tree, ensure nodes can still be found
     for i, n in enumerate(nodes):
         _debug('check #%d: %s', i, n)
-        n2 = btree.LeafNode(n.name)
+        n2 = cl(n.name)
         assert root.search(n2) is n
+
+    if not hashleaf:
+        assert root.first_leaf.key == b'0000'
+        assert root.last_leaf.key == last_leaf_name
 
     assert root.depth > 1
 
@@ -98,8 +110,9 @@ def test_large_tree():
     random.shuffle(nodes)
     for i, n in enumerate(nodes):
         _debug('remove #%d: %s', i, n)
-        n2 = btree.LeafNode(n.name)
+        n2 = cl(n.name)
         # Ensure add result looks sane
         assert root.search(n2) is n
         root.remove(n)
+        assert not root.search(n2)
     assert root.depth == 1
