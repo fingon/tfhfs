@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Thu Dec 15 07:38:38 2016 mstenber
-# Edit time:     78 min
+# Last modified: Thu Dec 15 07:54:13 2016 mstenber
+# Edit time:     79 min
 #
 """
 
@@ -174,6 +174,9 @@ def test_basic_xattr(oc):
     oc.ops.setxattr(llfuse.ROOT_INODE, b'foo', b'bar', oc.rctx_root)
     assert list(oc.ops.listxattr(llfuse.ROOT_INODE, oc.rctx_root)) == [b'foo']
     oc.ops.getxattr(llfuse.ROOT_INODE, b'foo', oc.rctx_root) == b'bar'
+    oc.ops.setxattr(llfuse.ROOT_INODE, b'baz', b'x', oc.rctx_root)
+    oc.ops.removexattr(llfuse.ROOT_INODE, b'foo', oc.rctx_root)
+    assert list(oc.ops.listxattr(llfuse.ROOT_INODE, oc.rctx_root)) == [b'baz']
 
 
 def test_ensure_full_implementation():

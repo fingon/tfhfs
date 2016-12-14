@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Thu Dec 15 07:41:22 2016 mstenber
-# Edit time:     144 min
+# Last modified: Thu Dec 15 07:55:35 2016 mstenber
+# Edit time:     145 min
 #
 """
 
@@ -239,8 +239,11 @@ class Operations(llfuse.Operations):
         inode.deref()
 
     def removexattr(self, inode, name, ctx):
-        assert self._initialized
-        raise llfuse.FUSEError(ENOSYS)
+        inode = self.forest.getdefault_inode_by_value(inode)
+        xa = inode.direntry.data.get('xattr', {})
+        assert_or_errno(name in xa, ENOATTR)
+        del xa[name]
+        inode.direntry.set_data('xattr', xa)
 
     def rename(self, parent_inode_old, name_old, parent_inode_new,
                name_new, ctx):
