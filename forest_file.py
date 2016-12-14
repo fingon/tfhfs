@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Thu Dec 15 06:09:33 2016 mstenber
-# Edit time:     204 min
+# Last modified: Thu Dec 15 07:01:45 2016 mstenber
+# Edit time:     209 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -65,12 +65,12 @@ class FDStore:
         self.freefds = []
 
     def allocate_fd(self):
-        if not self.fd2o:
-            fd = 1
-        elif self.freefds:
+        if self.freefds:
             fd = self.freefds.pop(0)
+            _debug('reused free fd #%d', fd)
         else:
             fd = len(self.fd2o) + 1
+            _debug('allocated new fd #%d', fd)
         assert fd not in self.fd2o
         self.fd2o[fd] = None
         return fd
@@ -82,8 +82,10 @@ class FDStore:
         assert o
         assert self.fd2o[fd] is None
         self.fd2o[fd] = o
+        _debug('register_fd #%d = %s', fd, o)
 
     def unregister_fd(self, fd):
+        _debug('unregister_fd #%d', fd)
         self.freefds.append(fd)
         del self.fd2o[fd]
 

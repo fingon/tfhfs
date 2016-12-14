@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Thu Dec 15 06:33:11 2016 mstenber
-# Edit time:     129 min
+# Last modified: Thu Dec 15 07:03:06 2016 mstenber
+# Edit time:     137 min
 #
 """
 
@@ -70,9 +70,9 @@ class Operations(llfuse.Operations):
         return entry
 
     def _inode_attributes(self, inode):
-        cn = inode.direntry
-        assert isinstance(cn, forest_nodes.DirectoryEntry)
-        entry = self._leaf_attributes(cn)
+        de = inode.direntry
+        assert isinstance(de, forest_nodes.DirectoryEntry)
+        entry = self._leaf_attributes(de)
         entry.st_ino = inode.value
         return entry
 
@@ -110,7 +110,8 @@ class Operations(llfuse.Operations):
         else:
             file_inode = self.forest.create_file(n, name)
         fd = file_inode.open(flags)
-        return fd, self._leaf_attributes(file_inode.leaf_node)
+        return fd, self._inode_attributes(file_inode)
+        # return fd, self._leaf_attributes(file_inode.leaf_node)
 
     def flush(self, fh):
         assert self._initialized
