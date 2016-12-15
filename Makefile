@@ -6,8 +6,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Nov 19 10:48:22 2016 mstenber
-# Last modified: Fri Nov 25 18:11:04 2016 mstenber
-# Edit time:     9 min
+# Last modified: Thu Dec 15 15:47:55 2016 mstenber
+# Edit time:     10 min
 #
 #
 
@@ -30,10 +30,11 @@ clean:
 
 # -rx = extra detail about xfails
 # -rw = extra detail about pytest warnings
-# --strict = mark as fail if xfail succeeds
+# --strict = warning = error
+# -o xfail_strict=True = xpass = fail as well
 
 test: .done.requirements
-	py.test --strict -rx -rw -n $(CORE_COUNT)
+	py.test --strict -rx -rw -o xfail_strict=True -n $(CORE_COUNT)
 
 .done.requirements: requirements/*.txt
 	pip3 install --upgrade $(PIP_TO_USER) -c requirements/constraints.txt -r requirements/runtime.txt -r requirements/development.txt
