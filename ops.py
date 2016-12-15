@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Thu Dec 15 13:39:42 2016 mstenber
-# Edit time:     197 min
+# Last modified: Thu Dec 15 14:14:34 2016 mstenber
+# Edit time:     204 min
 #
 """
 
@@ -38,6 +38,7 @@ http://pythonhosted.org/llfuse/fuse_api.html
 
 import logging
 import os
+import stat
 from errno import EEXIST, ENOATTR, ENOENT, ENOSYS, ENOTEMPTY, EPERM
 
 import forest_nodes
@@ -81,6 +82,7 @@ class Operations(llfuse.Operations):
                      'st_ctime_ns'):
             v = leaf_node.data.get(attr)
             if v is not None:
+                _debug('%s = %s', attr, v)
                 setattr(entry, attr, v)
         return entry
 
@@ -233,8 +235,13 @@ class Operations(llfuse.Operations):
 
     def mknod(self, parent_inode, name, mode, rdev, ctx):
         assert self._initialized
-        assert_or_errno(self.access(parent_inode, WX_OK, ctx), EPERM)
-        raise llfuse.FUSEError(ENOSYS)
+        fd, a = self.create(parent_inode, name, mode,
+                            os.O_TRUNC | os.O_CREAT, ctx)
+        inode = self.forest.get_inode_by_value(a.st_ino)
+        inode.ref()
+        if stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
+            inode.direntry.set_data('st_rdev', rdev)
+        self.release(fd)
 
     def open(self, inode, flags, ctx):
         assert self._initialized

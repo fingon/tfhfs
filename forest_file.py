@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Thu Dec 15 13:48:14 2016 mstenber
-# Edit time:     216 min
+# Last modified: Thu Dec 15 14:22:30 2016 mstenber
+# Edit time:     218 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -129,13 +129,17 @@ class FileDescriptor:
 
 class FileINode(inode.INode):
 
+    @property
+    def is_minifile(self):
+        return self.leaf_node and self.leaf_node.data.get('minifile')
+
     def load_node(self):
         if self.node is None:
             ln = self.leaf_node
             if ln:
                 bid = ln.block_id
                 if bid:
-                    if ln.mode & const.DENTRY_MODE_MINIFILE:
+                    if self.is_minifile:
                         self.set_node(FileData(self.store, bid, None))
                     else:
                         self.set_node(FileBlockTreeNode(self.store, bid))
@@ -274,7 +278,7 @@ class FileINode(inode.INode):
         _debug('_to_block_tree %d', size)
         ln = self.leaf_node
         if not isinstance(self.load_node(), FileBlockTreeNode):
-            ln.set_clear_mode_bits(0, const.DENTRY_MODE_MINIFILE)
+            ln.set_data('minifile', None)
             # If we are not already tree, convert to tree + write data in
             had_size = self.size
             buf = self.read(0, had_size)
@@ -290,7 +294,7 @@ class FileINode(inode.INode):
         s = self._read(0, size, pad=True)
         ln = self.leaf_node
         if ln:
-            ln.set_clear_mode_bits(const.DENTRY_MODE_MINIFILE, 0)
+            ln.set_data('minifile', True)
             ln.set_block_data(None)
         self.set_node(FileData(self.store, None, s))
 
@@ -298,6 +302,7 @@ class FileINode(inode.INode):
         _debug('_to_interned_data %d', size)
         s = self._read(0, size, pad=True)
         ln = self.leaf_node
+        ln.set_data('minifile', None)
         ln.set_block_id(None)
         ln.set_block_data(s)
 

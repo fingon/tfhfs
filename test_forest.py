@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Jul  5 11:49:58 2016 mstenber
-# Last modified: Thu Dec 15 08:11:44 2016 mstenber
-# Edit time:     70 min
+# Last modified: Thu Dec 15 14:12:18 2016 mstenber
+# Edit time:     72 min
 #
 """
 
@@ -19,6 +19,7 @@ Test the 'forest' module
 """
 
 import logging
+import stat
 
 import forest
 from storage import NopBlockCodec, SQLiteStorage, TypedBlockCodec
@@ -58,7 +59,8 @@ def testforest():
     f2c = f2.lookup(f2.root, b'foo')
     f2c2 = f2.lookup(f2.root, b'foo')
     assert f2c is f2c2
-    assert f2c and f2c.leaf_node.nonempty_data == dict(foo=42)
+    assert f2c and f2c.leaf_node.nonempty_data == dict(
+        foo=42, st_mode=stat.S_IFREG)
     assert not f2.root.node.dirty
 
     # add a directory

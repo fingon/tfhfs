@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Thu Dec 15 08:08:48 2016 mstenber
+# Last modified: Thu Dec 15 14:22:57 2016 mstenber
 # Edit time:     33 min
 #
 """
@@ -17,6 +17,8 @@
 These are the btree node subclasses employed by the Forest class.
 
 """
+
+import stat
 
 import btree
 import const
@@ -143,12 +145,13 @@ class NamedLeafNode(DataMixin, btree.LeafNode):
                                _cbor_data=0x24))
 
     # Used to pickle _data
-    cbor_data_pickler_dict = dict(mode=0x31, xattr=0x32, foo=0x42)
+    cbor_data_pickler_dict = dict(mode=0x31, xattr=0x32, minifile=0x33,
+                                  foo=0x42)
+    # ^ 'foo' is used in tests only, as random metadata
     for v, k in enumerate(const.ATTR_STAT_KEYS, 0x50):
         cbor_data_pickler_dict[k] = v
 
     cbor_data_pickler = CBORPickler(cbor_data_pickler_dict)
-    # 'foo' is used in tests only, as random metadata
 
     block_id = None
     block_data = None
@@ -185,7 +188,7 @@ class DirectoryEntry(NamedLeafNode):
 
     @property
     def is_dir(self):
-        return self.mode & const.DENTRY_MODE_DIR
+        return self.mode & stat.S_IFDIR
 
     @property
     def is_file(self):
@@ -193,7 +196,7 @@ class DirectoryEntry(NamedLeafNode):
 
     @property
     def mode(self):
-        return self.data['mode']
+        return self.data['st_mode']
 
     def set_block_data(self, s):
         if self.block_data == s:
@@ -205,7 +208,7 @@ class DirectoryEntry(NamedLeafNode):
         nm = (self.mode | set_bits) & ~clear_bits
         if nm == self.mode:
             return
-        self.set_data('mode', nm)
+        self.set_data('st_mode', nm)
 
 
 class DirectoryTreeNode(LoadedTreeNode):

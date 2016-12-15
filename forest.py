@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Wed Dec 14 10:06:19 2016 mstenber
-# Edit time:     551 min
+# Last modified: Thu Dec 15 14:20:03 2016 mstenber
+# Edit time:     557 min
 #
 """This is the 'forest layer' main module.
 
@@ -39,6 +39,7 @@ particular (file) inode.
 """
 
 import logging
+import stat
 
 import const
 import inode
@@ -82,7 +83,7 @@ class Forest(inode.INodeStore, FDStore):
 
     def _create(self, mode, dir_inode, name):
         # Create 'content tree' root node for the new child
-        is_directory = mode & const.DENTRY_MODE_DIR
+        is_directory = mode & stat.S_IFDIR
         if is_directory:
             cl = self.directory_node_class
             node = cl(self)
@@ -100,14 +101,14 @@ class Forest(inode.INodeStore, FDStore):
                                cl=((not is_directory) and FileINode))
         if node:
             node.mark_dirty()
-        leaf.set_data('mode', is_directory)
+        leaf.set_data('st_mode', mode)
         return inode
 
     def create_dir(self, dir_inode, name):
-        return self._create(const.DENTRY_MODE_DIR, dir_inode, name)
+        return self._create(stat.S_IFDIR, dir_inode, name)
 
     def create_file(self, dir_inode, name):
-        return self._create(0, dir_inode, name)
+        return self._create(stat.S_IFREG, dir_inode, name)
 
     def flush(self):
         _debug('flush')

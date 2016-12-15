@@ -9,13 +9,14 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jul  2 21:10:04 2016 mstenber
-# Last modified: Thu Dec 15 13:38:34 2016 mstenber
-# Edit time:     13 min
+# Last modified: Thu Dec 15 14:20:35 2016 mstenber
+# Edit time:     19 min
 #
 """
 
 """
 
+import stat
 
 # 'type' of a (typed) block.
 
@@ -35,9 +36,6 @@ BIT_WEAK = 0x20  # weak block -> no references
 BIT_LEAFY = 0x40  # children are leaves of base type
 
 BIT_COMPRESSED = 0x80  # compression was applied to the block
-
-DENTRY_MODE_DIR = 0o1000
-DENTRY_MODE_MINIFILE = 0o2000  # single data block; no underlying tree
 
 # how much data we intern inside DirectoryEntries
 INTERNED_BLOCK_DATA_SIZE_LIMIT = 128
