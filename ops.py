@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Thu Dec 15 16:18:39 2016 mstenber
-# Edit time:     212 min
+# Last modified: Thu Dec 15 20:06:07 2016 mstenber
+# Edit time:     225 min
 #
 """
 
@@ -143,15 +143,21 @@ class Operations(llfuse.Operations):
         _debug('create @i:%s %s m%o f:0x%x %s',
                parent_inode, name, mode, flags, ctx)
         n = self.forest.get_inode_by_value(parent_inode)
-        file_inode = self.forest.lookup(n, name)
-        if file_inode:
-            assert_or_errno(not (flags & os.O_EXCL), EEXIST)
-            assert_or_errno(self.access(file_inode.value,
-                                        _flags_to_perm(flags), ctx), EPERM)
-        else:
-            file_inode = self.forest.create_file(n, name)
-            self._set_de_perms_from_mode_ctx(file_inode.direntry, mode, ctx)
-        fd = file_inode.open(flags)
+        try:
+            file_inode = self.forest.lookup(n, name)
+            if file_inode:
+                assert_or_errno(not (flags & os.O_EXCL), EEXIST)
+                assert_or_errno(self.access(file_inode.value,
+                                            _flags_to_perm(flags), ctx), EPERM)
+            else:
+                file_inode = self.forest.create_file(n, name)
+                self._set_de_perms_from_mode_ctx(file_inode.direntry, mode,
+                                                 ctx)
+            fd = file_inode.open(flags)
+        except:
+            file_inode.deref()
+            # Otherwise we can return it and increment the refcnt
+            raise
         return fd, self._inode_attributes(file_inode)
         # return fd, self._leaf_attributes(file_inode.leaf_node)
 
@@ -217,11 +223,13 @@ class Operations(llfuse.Operations):
         assert_or_errno(self.access(parent_inode, os.X_OK, ctx), EPERM)
         n = self.forest.get_inode_by_value(parent_inode)
         if name == b'.':
-            pass
+            n.ref()
         elif name == b'..':
             cn = n.leaf_node
             if cn:
-                n = self.forest.getdefault_inode_by_node(cn.root)
+                n = self.forest.get_inode_by_node(cn.root).ref()
+            else:
+                n.ref()
         else:
             n = self.forest.lookup(n, name)
             assert_or_errno(n, ENOENT)
@@ -310,20 +318,27 @@ class Operations(llfuse.Operations):
         parent_inode_new = self.forest.get_inode_by_value(parent_inode_new)
         n = self.forest.lookup(parent_inode_old, name_old)
         assert_or_errno(n, ENOENT)
-        self.unlink(parent_inode_old.value, name_old, ctx)
-        self.link(n.value, parent_inode_new.value, name_new, ctx)
+        try:
+            self.unlink(parent_inode_old.value, name_old, ctx)
+            self.link(n.value, parent_inode_new.value, name_new, ctx)
+        finally:
+            n.deref()
 
     def rmdir(self, parent_inode, name, ctx):
         assert self._initialized
         assert_or_errno(self.access(parent_inode, WX_OK, ctx), EPERM)
         raise llfuse.FUSEError(ENOSYS)
-        n = self.forest.get_inode_by_value(parent_inode)
-        n = self.forest.lookup(n, name)
-        assert_or_errno(n and n.leaf_node.is_dir and n.node, ENOENT)
-        assert_or_errno(self._de_access(n.leaf_node, WX_OK, ctx), EPERM)
-        assert_or_errno(not n.children, ENOTEMPTY)
-        n.leaf_node.root.remove(n.leaf_node)
-        # TBD: Also check the subdir permission?
+        pn = self.forest.get_inode_by_value(parent_inode)
+        n = self.forest.lookup(pn, name)
+        assert_or_errno(n)
+        try:
+            assert_or_errno(n.leaf_node.is_dir and n.node, ENOENT)
+            assert_or_errno(self._de_access(n.leaf_node, WX_OK, ctx), EPERM)
+            assert_or_errno(not n.children, ENOTEMPTY)
+            n.leaf_node.root.remove(n.leaf_node)
+            # TBD: Also check the subdir permission?
+        finally:
+            n.deref()
 
     def setattr(self, inode, attr, fields, fh, ctx):
         assert self._initialized
@@ -350,13 +365,15 @@ class Operations(llfuse.Operations):
     def unlink(self, parent_inode, name, ctx):
         assert self._initialized
         assert_or_errno(self.access(parent_inode, WX_OK, ctx), EPERM)
-        n = self.forest.get_inode_by_value(parent_inode)
-        cn = n.node.search_name(name)
-        assert_or_errno(cn and cn.is_file, ENOENT)
-        n2 = self.forest.get_inode_by_leaf_node(cn)
-        n.node.remove(cn)
-        if n2:
-            n2.set_leaf_node(None)
+        pn = self.forest.get_inode_by_value(parent_inode)
+        n = self.forest.lookup(pn, name)
+        assert_or_errno(n, ENOENT)
+        try:
+            assert_or_errno(n.leaf_node.is_file, ENOENT)
+            pn.node.remove(n.leaf_node)
+            n.set_leaf_node(None)
+        finally:
+            n.deref()
 
     def write(self, fh, off, buf):
         assert self._initialized

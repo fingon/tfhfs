@@ -7,7 +7,6 @@
 **** Truncation
 **** Insertion to various places
 **** Reading in clever and unexpected ways
-**** Lack of inode refcnt leakage
 
 ** Add missing functionality to forest module (e.g. remove API?)
 

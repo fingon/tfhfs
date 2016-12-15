@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Thu Dec 15 16:17:30 2016 mstenber
-# Edit time:     113 min
+# Last modified: Thu Dec 15 20:04:32 2016 mstenber
+# Edit time:     124 min
 #
 """
 
@@ -55,8 +55,8 @@ class OpsContext:
     def __init__(self):
         self.inodes = {b'.': llfuse.ROOT_INODE}
         storage = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
-        f = forest.Forest(storage, llfuse.ROOT_INODE)
-        self.ops = ops.Operations(f)
+        self.forest = forest.Forest(storage, llfuse.ROOT_INODE)
+        self.ops = ops.Operations(self.forest)
         self.rctx_root = RequestContextIsh()
         self.rctx_user = RequestContextIsh(uid=42, gid=7, pid=123)
         self.ops.init()
@@ -71,6 +71,9 @@ class OpsContext:
         self.create(llfuse.ROOT_INODE, b'user_file', self.rctx_user,
                     data=b'user')
 
+        # Ensure that stuff with 0 refcnt is gone?
+        self.forest.flush()
+
     def create(self, parent_inode, name, ctx, *,
                mode=0o600, flags=os.O_WRONLY, data=b''):
         r = self.ops.create(parent_inode, name, mode, flags, ctx)
@@ -82,6 +85,12 @@ class OpsContext:
             assert r == len(data)
         self.ops.release(fd)
 
+    def get_inode_counts(self):
+        d = {}
+        for n, inode in self.forest._value2inode.items():
+            d[n] = inode.refcnt
+        return d
+
     def mkdir(self, parent_inode, name, ctx, *, mode=0o700):
         attr = self.ops.mkdir(parent_inode, name, mode, ctx)
         assert isinstance(attr, llfuse.EntryAttributes)
@@ -91,7 +100,11 @@ class OpsContext:
 @pytest.fixture
 def oc():
     r = OpsContext()
+    pre_counts = r.get_inode_counts()
     yield r
+    assert not r.forest.fd2o
+    post_counts = r.get_inode_counts()
+    assert pre_counts == post_counts
     r.ops.destroy()
 
 
@@ -109,7 +122,8 @@ def attr_equal(a1, a2):
 def test_rename(oc):
     oc.ops.rename(llfuse.ROOT_INODE, b'user_dir',
                   llfuse.ROOT_INODE, b'x', oc.rctx_root)
-    oc.ops.lookup(llfuse.ROOT_INODE, b'x', oc.rctx_root)
+    a = oc.ops.lookup(llfuse.ROOT_INODE, b'x', oc.rctx_root)
+    oc.ops.forget1(a.st_ino)
     try:
         oc.ops.lookup(llfuse.ROOT_INODE, b'user_dir', oc.rctx_root)
         assert False
@@ -182,6 +196,7 @@ def test_basic_file_io(oc):
     r = oc.ops.create(llfuse.ROOT_INODE, b'x', 0, os.O_WRONLY, oc.rctx_root)
     (fh, attr) = r
     assert isinstance(attr, llfuse.EntryAttributes)
+    oc.ops.release(fh)
 
     fd = oc.ops.open(attr.st_ino, os.O_RDONLY, oc.rctx_root)
     assert isinstance(fd, int)
@@ -189,8 +204,8 @@ def test_basic_file_io(oc):
     oc.ops.fsyncdir(llfuse.ROOT_INODE, False)
     oc.ops.fsyncdir(llfuse.ROOT_INODE, True)
 
-    oc.ops.fsync(fh, False)
-    oc.ops.fsync(fh, True)
+    oc.ops.fsync(fd, False)
+    oc.ops.fsync(fd, True)
 
     oc.ops.flush(fd)  # should be nop?
 
@@ -203,12 +218,12 @@ def test_basic_file_io(oc):
     r = oc.ops.read(fd, 0, 123)
     assert r == b'foo'
 
-    oc.ops.fsync(fh, False)
-    oc.ops.fsync(fh, True)
+    oc.ops.fsync(fd, False)
+    oc.ops.fsync(fd, True)
 
     oc.ops.release(fd)
 
-    oc.ops.forget1(attr.st_ino)
+    oc.ops.forget1(attr.st_ino)  # from initial create
 
 
 @pytest.mark.parametrize('inode,user_ctx', [
