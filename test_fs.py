@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Fri Dec 16 07:09:52 2016 mstenber
-# Edit time:     117 min
+# Last modified: Fri Dec 16 07:36:21 2016 mstenber
+# Edit time:     121 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -128,7 +128,7 @@ class MockFS:
                 raise IOError(errno.ENOENT)
             if not (flags & (os.O_WRONLY | os.O_RDWR)):
                 raise IOError(errno.ENOENT)
-            mode = 0  # TBD
+            mode = 0o600
             fd, attrs = self.ops.create(llfuse.ROOT_INODE, filename,
                                         mode, flags, self.rctx_user)
         return MockFile(self, fd, flags)
@@ -143,6 +143,7 @@ class MockFS:
     def os_listdir(self, path):
         assert path == '/'  # no support for subdirs, yet
         inode = llfuse.ROOT_INODE
+
         fd = self.ops.opendir(inode, self.rctx_user)
         l = []
         for n, a, i in self.ops.readdir(fd, 0):

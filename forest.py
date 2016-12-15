@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Thu Dec 15 22:10:13 2016 mstenber
-# Edit time:     559 min
+# Last modified: Fri Dec 16 07:32:51 2016 mstenber
+# Edit time:     563 min
 #
 """This is the 'forest layer' main module.
 
@@ -83,7 +83,7 @@ class Forest(inode.INodeStore, FDStore):
 
     def _create(self, mode, dir_inode, name):
         # Create 'content tree' root node for the new child
-        is_directory = mode & stat.S_IFDIR
+        is_directory = stat.S_ISDIR(mode)
         if is_directory:
             cl = self.directory_node_class
             node = cl(self)
@@ -105,11 +105,15 @@ class Forest(inode.INodeStore, FDStore):
         return inode
 
     def create_dir(self, dir_inode, name, *, mode=0):
-        mode |= stat.S_IFDIR
+        if not stat.S_IFMT(mode):
+            mode |= stat.S_IFDIR
+        _debug('create_dir %s 0x%x', name, mode)
         return self._create(mode, dir_inode, name)
 
     def create_file(self, dir_inode, name, *, mode=0):
-        mode |= stat.S_IFREG
+        if not stat.S_IFMT(mode):
+            mode |= stat.S_IFREG
+        _debug('create_file %s 0x%x', name, mode)
         return self._create(mode, dir_inode, name)
 
     def flush(self):

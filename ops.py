@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Fri Dec 16 06:47:06 2016 mstenber
-# Edit time:     273 min
+# Last modified: Fri Dec 16 07:34:27 2016 mstenber
+# Edit time:     280 min
 #
 """
 
@@ -132,11 +132,10 @@ class Operations(llfuse.Operations):
         inode = self.forest.get_inode_by_value(inode)
         return self._de_access(inode.direntry, mode, ctx)
 
-    def _set_de_perms_from_mode_ctx(self, de, mode, ctx):
+    def _set_de_perms_from_ctx(self, de, ctx):
         de.set_data('st_uid', ctx.uid)
         de.set_data('st_gid', ctx.gid)
-        if mode >= 0:
-            de.set_data('st_mode', mode & ~ctx.umask)
+        de.set_data('st_mode', de.mode & ~ctx.umask)
 
     def create(self, parent_inode, name, mode, flags, ctx):
         assert self._initialized
@@ -152,9 +151,8 @@ class Operations(llfuse.Operations):
                 assert_or_errno(self.access(file_inode.value,
                                             _flags_to_perm(flags), ctx), EPERM)
             else:
-                file_inode = self.forest.create_file(n, name)
-                self._set_de_perms_from_mode_ctx(file_inode.direntry, mode,
-                                                 ctx)
+                file_inode = self.forest.create_file(n, name, mode=mode)
+                self._set_de_perms_from_ctx(file_inode.direntry, ctx)
             fd = file_inode.open(flags)
         except:
             file_inode.deref()
@@ -246,7 +244,7 @@ class Operations(llfuse.Operations):
         assert_or_errno(not cn, EEXIST)
         dir_inode = self.forest.create_dir(inode, name=name,
                                            mode=(mode & ~ctx.umask))
-        self._set_de_perms_from_mode_ctx(dir_inode.direntry, -1, ctx)
+        self._set_de_perms_from_ctx(dir_inode.direntry, ctx)
         return self._inode_attributes(dir_inode)
 
     def mknod(self, parent_inode, name, mode, rdev, ctx):
@@ -361,6 +359,7 @@ class Operations(llfuse.Operations):
         if fields.update_mtime:
             de.set_data('st_mtime_ns', attr.st_mtime_ns)
         if fields.update_mode:
+            # TBD: use S_IFMT + S_IMODE to filter this or not?
             de.set_data('st_mode', attr.st_mode)
         if fields.update_size:
             inode.set_size(attr.st_size)

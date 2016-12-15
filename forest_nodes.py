@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Fri Dec 16 07:13:37 2016 mstenber
-# Edit time:     35 min
+# Last modified: Fri Dec 16 07:37:30 2016 mstenber
+# Edit time:     37 min
 #
 """
 
@@ -192,7 +192,7 @@ class DirectoryEntry(NamedLeafNode):
 
     @property
     def is_file(self):
-        return stat.S_ISREG(self.is_dir)
+        return stat.S_ISREG(self.mode)
 
     @property
     def mode(self):

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Fri Dec 16 06:45:57 2016 mstenber
-# Edit time:     157 min
+# Last modified: Fri Dec 16 07:20:36 2016 mstenber
+# Edit time:     161 min
 #
 """
 
@@ -99,6 +99,7 @@ class OpsContext:
         if data:
             r = self.ops.write(fd, 0, data)
             assert r == len(data)
+        assert stat.S_ISREG(attr.st_mode)
         self.ops.release(fd)
 
     def get_inode_counts(self):
@@ -111,6 +112,7 @@ class OpsContext:
         attr = self.ops.mkdir(parent_inode, name, mode, ctx)
         assert isinstance(attr, llfuse.EntryAttributes)
         self.inodes[name] = attr.st_ino
+        assert stat.S_ISDIR(attr.st_mode)
         return attr
 
 
@@ -171,6 +173,7 @@ def test_rename(oc):
 
 def test_lookup(oc):
     a = oc.ops.lookup(llfuse.ROOT_INODE, b'.', oc.rctx_root)
+    assert stat.S_ISDIR(a.st_mode)
     a2 = oc.ops.lookup(llfuse.ROOT_INODE, b'..', oc.rctx_root)
     assert attr_equal(a, a2)
     a3 = oc.ops.lookup(oc.inodes[b'user_dir'], b'..', oc.rctx_root)
