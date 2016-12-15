@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Fri Dec 16 07:42:45 2016 mstenber
-# Edit time:     122 min
+# Last modified: Fri Dec 16 08:41:17 2016 mstenber
+# Edit time:     123 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -131,6 +131,7 @@ class MockFS:
             mode = 0o600
             fd, attrs = self.ops.create(llfuse.ROOT_INODE, filename,
                                         mode, flags, self.rctx_user)
+            assert attrs.st_ino
         return MockFile(self, fd, flags)
 
     def os_close(self, fd):
@@ -150,6 +151,7 @@ class MockFS:
         while True:
             try:
                 n, a, ofs = next(self.ops.readdir(fd, ofs))
+                assert a.st_ino  # otherwise not visible in ls
             except StopIteration:
                 break
             l.append(n.decode())

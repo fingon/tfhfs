@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Fri Dec 16 06:57:31 2016 mstenber
-# Edit time:     386 min
+# Last modified: Fri Dec 16 08:48:19 2016 mstenber
+# Edit time:     392 min
 #
 """This is the 'storage layer' main module.
 
@@ -177,11 +177,6 @@ _nopiterator = _NopIterator()
 
 class Storage:
 
-    def __init__(self, block_data_references_callback=None):
-        if block_data_references_callback:
-            self.block_data_references_callback = \
-                block_data_references_callback
-
     def block_data_references_callback(self, block_data):
         return _nopiterator
 
@@ -252,6 +247,9 @@ layer."""
         assert refcnt >= 0
         self.set_block_refcnt(block_id, refcnt)
         return refcnt > 0
+
+    def set_block_data_references_callback(self, callback):
+        self.block_data_references_callback = callback
 
     def set_block_name(self, block_id, n):
         old_block_id = self.get_block_id_by_name(n)
@@ -643,6 +641,13 @@ class DelayedStorage(Storage):
 
     def get_bytes_used(self):
         return self.storage.get_bytes_used()
+
+    # def set_block_data_references_callback(self, callback):
+    #    self.storage.set_block_data_references_callback(callback)
+    # TBD: Should we do it here, or not?
+    # If not, we need some sort of reference count change callback
+    # to propagate to here. If yes, we need to fix delete case :p
+    # (right now only add is covered)
 
     def set_block_id_has_references_callback(self, callback):
         self.storage.set_block_id_has_references_callback(callback)

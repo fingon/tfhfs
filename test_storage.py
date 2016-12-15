@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Fri Dec 16 06:55:26 2016 mstenber
-# Edit time:     133 min
+# Last modified: Fri Dec 16 08:42:47 2016 mstenber
+# Edit time:     134 min
 #
 """
 
@@ -105,7 +105,7 @@ def _prod_storage(s, flush=_nop):
     def _depfun(block_id):
         return deps.get(block_id, [])
     _debug('## add id2 + id1 with dep on id2')
-    s.block_data_references_callback = _depfun
+    s.set_block_data_references_callback(_depfun)
     s.store_block(b'id2', b'content2')
     s.store_block(b'id1', b'content1')
     _flush_twice(s, flush)

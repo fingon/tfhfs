@@ -11,6 +11,9 @@
 .. it is TBD why the current code even works, and it clearly does NOT clean
 dangling references probably correctly..
 
+See TBD in storage.py for details on why it is broken in the delete case at
+least..
+
 ** Check/test
 
 *** Truncation
