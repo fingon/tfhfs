@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Thu Dec 15 20:04:32 2016 mstenber
-# Edit time:     124 min
+# Last modified: Thu Dec 15 20:13:26 2016 mstenber
+# Edit time:     129 min
 #
 """
 
@@ -61,15 +61,19 @@ class OpsContext:
         self.rctx_user = RequestContextIsh(uid=42, gid=7, pid=123)
         self.ops.init()
 
-        # Create root-owned directory + file
+        # Create root-owned directory + file + file in directory
         self.mkdir(llfuse.ROOT_INODE, b'root_dir', self.rctx_root)
         self.create(llfuse.ROOT_INODE, b'root_file', self.rctx_root,
                     data=b'root')
+        self.create(self.inodes[b'root_dir'], b'root_file_in', self.rctx_root,
+                    data=b'root2')
 
         # Create user-owned directory + file
         self.mkdir(llfuse.ROOT_INODE, b'user_dir', self.rctx_user)
         self.create(llfuse.ROOT_INODE, b'user_file', self.rctx_user,
                     data=b'user')
+        self.create(self.inodes[b'user_dir'], b'user_file_in', self.rctx_user,
+                    data=b'user2')
 
         # Ensure that stuff with 0 refcnt is gone?
         self.forest.flush()
@@ -117,6 +121,13 @@ def attr_equal(a1, a2):
     a1 = attr_to_dict(a1)
     a2 = attr_to_dict(a2)
     return a1 == a2
+
+
+def test_dir(oc):
+    fd = oc.ops.opendir(oc.inodes[b'root_dir'], oc.rctx_root)
+    l = list(x[0] for x in oc.ops.readdir(fd, 0))
+    assert l == [b'root_file_in']
+    oc.ops.releasedir(fd)
 
 
 def test_rename(oc):
