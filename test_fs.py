@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Fri Dec 16 07:36:21 2016 mstenber
-# Edit time:     121 min
+# Last modified: Fri Dec 16 07:42:45 2016 mstenber
+# Edit time:     122 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -146,7 +146,12 @@ class MockFS:
 
         fd = self.ops.opendir(inode, self.rctx_user)
         l = []
-        for n, a, i in self.ops.readdir(fd, 0):
+        ofs = 0
+        while True:
+            try:
+                n, a, ofs = next(self.ops.readdir(fd, ofs))
+            except StopIteration:
+                break
             l.append(n.decode())
         self.ops.releasedir(fd)
         return l

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Fri Dec 16 07:34:27 2016 mstenber
-# Edit time:     280 min
+# Last modified: Fri Dec 16 07:43:04 2016 mstenber
+# Edit time:     283 min
 #
 """
 
@@ -278,13 +278,13 @@ class Operations(llfuse.Operations):
         assert self._initialized
         inode = self.forest.get_inode_by_value(fh)
         pln = None
-        for i, ln in enumerate(inode.node.get_leaves()):
+        for i, ln in enumerate(inode.node.get_leaves(), 1):
             # Additions may screw up the tree bit
             if (pln is not None and pln.key > ln.key) or not ln.name:
                 pass
             else:
                 pln = ln
-                if i >= off:
+                if i > off:
                     t = (ln.name, self._leaf_attributes(ln), i)
                     yield t
 
