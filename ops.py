@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Thu Dec 15 20:06:07 2016 mstenber
-# Edit time:     225 min
+# Last modified: Thu Dec 15 22:22:03 2016 mstenber
+# Edit time:     232 min
 #
 """
 
@@ -134,7 +134,8 @@ class Operations(llfuse.Operations):
     def _set_de_perms_from_mode_ctx(self, de, mode, ctx):
         de.set_data('st_uid', ctx.uid)
         de.set_data('st_gid', ctx.gid)
-        de.set_data('st_mode', mode & ctx.umask)
+        if mode >= 0:
+            de.set_data('st_mode', mode & ctx.umask)
 
     def create(self, parent_inode, name, mode, flags, ctx):
         assert self._initialized
@@ -242,20 +243,20 @@ class Operations(llfuse.Operations):
         inode = self.forest.get_inode_by_value(parent_inode)
         cn = inode.node.search_name(name)
         assert_or_errno(not cn, EEXIST)
-        # TBD: access
-        dir_inode = self.forest.create_dir(inode, name=name)
-        self._set_de_perms_from_mode_ctx(dir_inode.direntry, mode, ctx)
-        return self.lookup(parent_inode, name, ctx)
+        dir_inode = self.forest.create_dir(inode, name=name,
+                                           mode=(mode & ctx.umask))
+        self._set_de_perms_from_mode_ctx(dir_inode.direntry, -1, ctx)
+        return self._inode_attributes(dir_inode)
 
     def mknod(self, parent_inode, name, mode, rdev, ctx):
         assert self._initialized
         fd, a = self.create(parent_inode, name, mode,
                             os.O_TRUNC | os.O_CREAT, ctx)
         inode = self.forest.get_inode_by_value(a.st_ino)
-        inode.ref()
         if stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
             inode.direntry.set_data('st_rdev', rdev)
         self.release(fd)
+        return self._inode_attributes(inode)
 
     def open(self, inode, flags, ctx):
         assert self._initialized
@@ -319,7 +320,7 @@ class Operations(llfuse.Operations):
         n = self.forest.lookup(parent_inode_old, name_old)
         assert_or_errno(n, ENOENT)
         try:
-            self.unlink(parent_inode_old.value, name_old, ctx)
+            self.unlink(parent_inode_old.value, name_old, ctx, allow_any=True)
             self.link(n.value, parent_inode_new.value, name_new, ctx)
         finally:
             n.deref()
@@ -327,14 +328,13 @@ class Operations(llfuse.Operations):
     def rmdir(self, parent_inode, name, ctx):
         assert self._initialized
         assert_or_errno(self.access(parent_inode, WX_OK, ctx), EPERM)
-        raise llfuse.FUSEError(ENOSYS)
         pn = self.forest.get_inode_by_value(parent_inode)
         n = self.forest.lookup(pn, name)
-        assert_or_errno(n)
+        assert_or_errno(n, ENOENT)
         try:
-            assert_or_errno(n.leaf_node.is_dir and n.node, ENOENT)
+            assert_or_errno(n.leaf_node.is_dir, ENOENT)
             assert_or_errno(self._de_access(n.leaf_node, WX_OK, ctx), EPERM)
-            assert_or_errno(not n.children, ENOTEMPTY)
+            assert_or_errno(not n.node.children, ENOTEMPTY)
             n.leaf_node.root.remove(n.leaf_node)
             # TBD: Also check the subdir permission?
         finally:
@@ -362,14 +362,14 @@ class Operations(llfuse.Operations):
         assert_or_errno(self.access(parent_inode, WX_OK, ctx), EPERM)
         raise llfuse.FUSEError(ENOSYS)
 
-    def unlink(self, parent_inode, name, ctx):
+    def unlink(self, parent_inode, name, ctx, *, allow_any=False):
         assert self._initialized
         assert_or_errno(self.access(parent_inode, WX_OK, ctx), EPERM)
         pn = self.forest.get_inode_by_value(parent_inode)
         n = self.forest.lookup(pn, name)
         assert_or_errno(n, ENOENT)
         try:
-            assert_or_errno(n.leaf_node.is_file, ENOENT)
+            assert_or_errno(n.leaf_node.is_file or allow_any, ENOENT)
             pn.node.remove(n.leaf_node)
             n.set_leaf_node(None)
         finally:

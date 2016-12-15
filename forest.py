@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Thu Dec 15 14:20:03 2016 mstenber
-# Edit time:     557 min
+# Last modified: Thu Dec 15 22:10:13 2016 mstenber
+# Edit time:     559 min
 #
 """This is the 'forest layer' main module.
 
@@ -104,11 +104,13 @@ class Forest(inode.INodeStore, FDStore):
         leaf.set_data('st_mode', mode)
         return inode
 
-    def create_dir(self, dir_inode, name):
-        return self._create(stat.S_IFDIR, dir_inode, name)
+    def create_dir(self, dir_inode, name, *, mode=0):
+        mode |= stat.S_IFDIR
+        return self._create(mode, dir_inode, name)
 
-    def create_file(self, dir_inode, name):
-        return self._create(stat.S_IFREG, dir_inode, name)
+    def create_file(self, dir_inode, name, *, mode=0):
+        mode |= stat.S_IFREG
+        return self._create(mode, dir_inode, name)
 
     def flush(self):
         _debug('flush')

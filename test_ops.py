@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Thu Dec 15 21:52:53 2016 mstenber
-# Edit time:     130 min
+# Last modified: Thu Dec 15 22:19:46 2016 mstenber
+# Edit time:     139 min
 #
 """
 
@@ -26,6 +26,7 @@ would make sense.
 import errno
 import logging
 import os
+import stat
 
 import pytest
 
@@ -99,6 +100,7 @@ class OpsContext:
         attr = self.ops.mkdir(parent_inode, name, mode, ctx)
         assert isinstance(attr, llfuse.EntryAttributes)
         self.inodes[name] = attr.st_ino
+        return attr
 
 
 @pytest.fixture
@@ -186,13 +188,32 @@ def testopen_fail(oc):
 
 
 @pytest.mark.xfail(raises=llfuse.FUSEError)
-def testmkdir_fail(oc):
+def testmkdir_fail_perm(oc):
     oc.ops.mkdir(llfuse.ROOT_INODE, b'root_dir', 0, oc.rctx_user)
 
 
+def testmkdir_ok(oc):
+    a = oc.mkdir(llfuse.ROOT_INODE, b'x', oc.rctx_user)
+    oc.ops.forget1(a.st_ino)
+
+
 @pytest.mark.xfail(raises=llfuse.FUSEError)
-def testrmdir_fail(oc):
+def testrmdir_fail_perm(oc):
     oc.ops.rmdir(llfuse.ROOT_INODE, b'root_dir', oc.rctx_user)
+
+
+def testrmdir_fail_notempty(oc):
+    try:
+        oc.ops.rmdir(llfuse.ROOT_INODE, b'root_dir', oc.rctx_root)
+        assert False
+    except llfuse.FUSEError as e:
+        assert e.errno == errno.ENOTEMPTY
+
+
+def testrmdir_ok(oc):
+    a = oc.mkdir(llfuse.ROOT_INODE, b'x', oc.rctx_user)
+    oc.ops.rmdir(llfuse.ROOT_INODE, b'x', oc.rctx_user)
+    oc.ops.forget1(a.st_ino)
 
 # destroy implicitly tested in tearDown
 
@@ -264,6 +285,17 @@ def test_basic_xattr(oc):
     oc.ops.setxattr(llfuse.ROOT_INODE, b'baz', b'x', oc.rctx_root)
     oc.ops.removexattr(llfuse.ROOT_INODE, b'foo', oc.rctx_root)
     assert list(oc.ops.listxattr(llfuse.ROOT_INODE, oc.rctx_root)) == [b'baz']
+
+
+def test_mknod_c(oc):
+    a = oc.ops.mknod(llfuse.ROOT_INODE, b'cdev',
+                     stat.S_IFCHR, 42, oc.rctx_user)
+    assert a.st_rdev == 42
+    oc.ops.forget1(a.st_ino)
+    a = oc.ops.mknod(llfuse.ROOT_INODE, b'bdev',
+                     stat.S_IFBLK, 43, oc.rctx_user)
+    assert a.st_rdev == 43
+    oc.ops.forget1(a.st_ino)
 
 
 def test_ensure_full_implementation():
