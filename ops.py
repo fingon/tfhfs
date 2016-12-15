@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Thu Dec 15 15:38:12 2016 mstenber
+# Last modified: Thu Dec 15 16:18:39 2016 mstenber
 # Edit time:     212 min
 #
 """
@@ -146,6 +146,8 @@ class Operations(llfuse.Operations):
         file_inode = self.forest.lookup(n, name)
         if file_inode:
             assert_or_errno(not (flags & os.O_EXCL), EEXIST)
+            assert_or_errno(self.access(file_inode.value,
+                                        _flags_to_perm(flags), ctx), EPERM)
         else:
             file_inode = self.forest.create_file(n, name)
             self._set_de_perms_from_mode_ctx(file_inode.direntry, mode, ctx)

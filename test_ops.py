@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Thu Dec 15 15:49:49 2016 mstenber
-# Edit time:     109 min
+# Last modified: Thu Dec 15 16:17:30 2016 mstenber
+# Edit time:     113 min
 #
 """
 
@@ -156,7 +156,17 @@ def testcreate_fail(oc):
 
 @pytest.mark.xfail(raises=llfuse.FUSEError)
 def testopen_fail(oc):
-    oc.open(oc.inodes[b'root_file'], os.O_RDONLY, oc.rctx_user)
+    oc.ops.open(oc.inodes[b'root_file'], os.O_RDONLY, oc.rctx_user)
+
+
+@pytest.mark.xfail(raises=llfuse.FUSEError)
+def testmkdir_fail(oc):
+    oc.ops.mkdir(llfuse.ROOT_INODE, b'root_dir', 0, oc.rctx_user)
+
+
+@pytest.mark.xfail(raises=llfuse.FUSEError)
+def testrmdir_fail(oc):
+    oc.ops.rmdir(llfuse.ROOT_INODE, b'root_dir', oc.rctx_user)
 
 # destroy implicitly tested in tearDown
 
