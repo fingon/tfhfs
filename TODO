@@ -7,7 +7,7 @@
 **** Truncation
 **** Insertion to various places
 **** Reading in clever and unexpected ways
-
+**** Lack of inode refcnt leakage
 
 ** Add missing functionality to forest module (e.g. remove API?)
 
@@ -19,9 +19,17 @@ mutation should not result in non-mutated files being omitted/returned
 twice (this should be trivially given we iterate automatically by
 filename within the tree order?)
 
+* Pending 2 (before it can be used for ANYTHING); TBD P2 in code
+
+** symlink support
+
 * Pending before it can be used for single-user, multiple-installations
 
 ** Implement tree sync code (SHOULD be straightforward, but who knows)
+
+* Pending before it can be used (reliably) for multi-user
+
+** Sticky bit
 
 * Pending (eventually)
 

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Thu Dec 15 13:37:04 2016 mstenber
-# Edit time:     102 min
+# Last modified: Thu Dec 15 15:49:49 2016 mstenber
+# Edit time:     109 min
 #
 """
 
@@ -106,6 +106,17 @@ def attr_equal(a1, a2):
     return a1 == a2
 
 
+def test_rename(oc):
+    oc.ops.rename(llfuse.ROOT_INODE, b'user_dir',
+                  llfuse.ROOT_INODE, b'x', oc.rctx_root)
+    oc.ops.lookup(llfuse.ROOT_INODE, b'x', oc.rctx_root)
+    try:
+        oc.ops.lookup(llfuse.ROOT_INODE, b'user_dir', oc.rctx_root)
+        assert False
+    except llfuse.FUSEError:
+        pass
+
+
 def test_lookup(oc):
     a = oc.ops.lookup(llfuse.ROOT_INODE, b'.', oc.rctx_root)
     a2 = oc.ops.lookup(llfuse.ROOT_INODE, b'..', oc.rctx_root)
@@ -142,10 +153,14 @@ def test_access(oc, filename, is_root, expect_success):
 def testcreate_fail(oc):
     oc.create(llfuse.ROOT_INODE, b'root_file', oc.rctx_user)
 
+
+@pytest.mark.xfail(raises=llfuse.FUSEError)
+def testopen_fail(oc):
+    oc.open(oc.inodes[b'root_file'], os.O_RDONLY, oc.rctx_user)
+
 # destroy implicitly tested in tearDown
 
 
-@pytest.mark.xfail(raises=llfuse.FUSEError)
 def test_flush(oc):
     # TBD - it should not have any real semantics?
     pass
@@ -153,7 +168,6 @@ def test_flush(oc):
 # mkdir implicitly tested in mkdir
 
 
-@pytest.mark.xfail(raises=llfuse.FUSEError)
 def test_basic_file_io(oc):
     r = oc.ops.create(llfuse.ROOT_INODE, b'x', 0, os.O_WRONLY, oc.rctx_root)
     (fh, attr) = r
@@ -187,7 +201,6 @@ def test_basic_file_io(oc):
     oc.ops.forget1(attr.st_ino)
 
 
-@pytest.mark.xfail(raises=llfuse.FUSEError)
 @pytest.mark.parametrize('inode,user_ctx', [
     (llfuse.ROOT_INODE, True),
     (llfuse.ROOT_INODE, False),

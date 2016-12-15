@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Thu Dec 15 14:14:34 2016 mstenber
-# Edit time:     204 min
+# Last modified: Thu Dec 15 15:38:12 2016 mstenber
+# Edit time:     212 min
 #
 """
 
@@ -196,9 +196,13 @@ class Operations(llfuse.Operations):
         inode = self.forest.get_inode_by_value(inode)
         assert_or_errno(not inode.leaf_node, ENOSYS)
         parent_inode = self.forest.get_inode_by_value(new_parent_inode)
-        raise llfuse.FUSEError(ENOSYS)
-        # TBD: what to put here?
-        inode.set_leaf_node(ln)
+        n = parent_inode.node.search_name(new_name)
+        if n:
+            self.unlink(new_parent_inode, new_name, ctx)
+        rn = parent_inode.node
+        leaf = rn.leaf_class(self.forest, name=new_name)
+        self.forest.get_inode_by_node(rn).set_node(rn.add(leaf))
+        inode.set_leaf_node(leaf)
 
     def listxattr(self, inode, ctx):
         assert self._initialized
@@ -277,7 +281,7 @@ class Operations(llfuse.Operations):
     def readlink(self, inode, ctx):
         assert self._initialized
         assert_or_errno(self.access(inode, os.R_OK, ctx), EPERM)
-        raise llfuse.FUSEError(ENOSYS)
+        raise llfuse.FUSEError(ENOSYS)  # TBD P2
 
     def release(self, fh):
         assert self._initialized
@@ -300,7 +304,12 @@ class Operations(llfuse.Operations):
         assert self._initialized
         assert_or_errno(self.access(parent_inode_old, WX_OK, ctx), EPERM)
         assert_or_errno(self.access(parent_inode_new, WX_OK, ctx), EPERM)
-        raise llfuse.FUSEError(ENOSYS)
+        parent_inode_old = self.forest.get_inode_by_value(parent_inode_old)
+        parent_inode_new = self.forest.get_inode_by_value(parent_inode_new)
+        n = self.forest.lookup(parent_inode_old, name_old)
+        assert_or_errno(n, ENOENT)
+        self.unlink(parent_inode_old.value, name_old, ctx)
+        self.link(n.value, parent_inode_new.value, name_new, ctx)
 
     def rmdir(self, parent_inode, name, ctx):
         assert self._initialized
