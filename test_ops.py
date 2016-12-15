@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Thu Dec 15 20:13:26 2016 mstenber
-# Edit time:     129 min
+# Last modified: Thu Dec 15 21:52:53 2016 mstenber
+# Edit time:     130 min
 #
 """
 
@@ -106,6 +106,7 @@ def oc():
     r = OpsContext()
     pre_counts = r.get_inode_counts()
     yield r
+    r.forest.flush()
     assert not r.forest.fd2o
     post_counts = r.get_inode_counts()
     assert pre_counts == post_counts
