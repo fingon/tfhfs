@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Thu Dec 15 13:44:20 2016 mstenber
-# Edit time:     108 min
+# Last modified: Fri Dec 16 07:05:09 2016 mstenber
+# Edit time:     116 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -265,3 +265,21 @@ def test_huge_file():
         assert f.read(cnt) == b'b' + bytes([0] * (cnt - 1))
         f.seek(hugefilesize)
         assert f.read() == b'c'
+
+if __name__ == '__main__':
+    # TBD - argument parsing?
+    # TBD - logging?
+    storage = DictStorage()
+    forest = forest.Forest(storage, llfuse.ROOT_INODE)
+    ops = ops.Operations(forest)
+    fuse_options = set(llfuse.default_options)
+    fuse_options.remove('nonempty')  # TBD..
+    fuse_options.add('fsname=test_fs')
+    fuse_options.add('debug')  # ?
+    llfuse.init(ops, '/tmp/x', fuse_options)
+    try:
+        llfuse.main(workers=1)
+    except:
+        llfuse.close(unmount=False)
+        raise
+    llfuse.close()

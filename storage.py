@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Wed Dec 14 09:12:34 2016 mstenber
-# Edit time:     373 min
+# Last modified: Fri Dec 16 06:57:31 2016 mstenber
+# Edit time:     386 min
 #
 """This is the 'storage layer' main module.
 
@@ -28,6 +28,7 @@ import os
 import sqlite3
 import time
 
+import psutil
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -36,6 +37,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import const
 import lz4
 from endecode import Decoder, Encoder
+from util import getrecsizeof
 
 _debug = logging.getLogger(__name__).debug
 
@@ -180,7 +182,7 @@ class Storage:
             self.block_data_references_callback = \
                 block_data_references_callback
 
-    def block_data_references_callback(self, block_id):
+    def block_data_references_callback(self, block_data):
         return _nopiterator
 
     def delete_block_id_with_deps(self, block_id):
@@ -214,6 +216,12 @@ not exist, None is returned. If it exists, (block data, reference count) tuple i
     def get_block_id_by_name(self, n):
         """Get the block identifier for the named block. If the name is not
 set, None is returned."""
+        raise NotImplementedError
+
+    def get_bytes_available(self):
+        raise NotImplementedError
+
+    def get_bytes_used(self):
         raise NotImplementedError
 
     def on_add_block_data(self, block_data):
@@ -344,6 +352,14 @@ class DictStorage(ReferringStorage):
     def get_block_id_by_name(self, n):
         return self.name2bid.get(n)
 
+    def get_bytes_available(self):
+        return psutil.virtual_memory().available
+
+    def get_bytes_used(self):
+        seen = set()
+        return getrecsizeof(self.name2bid, seen) + \
+            getrecsizeof(self.bid2datarefcnt, seen)
+
     def set_block_name_raw(self, block_id, n):
         if block_id:
             self.name2bid[n] = block_id
@@ -371,6 +387,7 @@ mix the two hobby projects for now..
     """
 
     def __init__(self, *, codec=None, filename=':memory:', **kw):
+        self.filename = filename
         self.codec = codec or NopBlockCodec()
         self.conn = sqlite3.connect(filename)
         self._get_execute_result(
@@ -417,6 +434,16 @@ mix the two hobby projects for now..
             return
         assert len(r) == 1
         return r[0][0]
+
+    def get_bytes_available(self):
+        if self.filename == ':memory:':
+            return psutil.virtual_memory().available
+        return psutil.disk_usage(self.filename).free
+
+    def get_bytes_used(self):
+        r1 = self._get_execute_result('PRAGMA page_count;')
+        r2 = self._get_execute_result('PRAGMA page_size;')
+        return r1[0][0] * r2[0][0]
 
     def set_block_name_raw(self, block_id, n):
         assert n
@@ -610,6 +637,12 @@ class DelayedStorage(Storage):
 
     def get_block_id_by_name(self, n):
         return self._get_block_id_by_name(n)[0]
+
+    def get_bytes_available(self):
+        return self.storage.get_bytes_available()
+
+    def get_bytes_used(self):
+        return self.storage.get_bytes_used()
 
     def set_block_id_has_references_callback(self, callback):
         self.storage.set_block_id_has_references_callback(callback)

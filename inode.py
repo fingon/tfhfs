@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Thu Dec 15 13:44:57 2016 mstenber
-# Edit time:     39 min
+# Last modified: Fri Dec 16 05:17:34 2016 mstenber
+# Edit time:     40 min
 #
 """
 
@@ -71,6 +71,7 @@ class INodeStore:
         return self._lnode2inode[leaf_node]
 
     def get_inode_by_value(self, value):
+        assert isinstance(value, int)
         return self._value2inode[value]
 
     def getdefault_inode_by_node(self, node, default=None):

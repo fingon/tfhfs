@@ -2,11 +2,16 @@
 
 * Pending (before it can be used for ANYTHING)
 
+** Ensure that the block_data_references gets actually called
+
+.. it is TBD why the current code even works, and it clearly does NOT clean
+dangling references probably correctly..
+
 ** Check/test
 
-**** Truncation
-**** Insertion to various places
-**** Reading in clever and unexpected ways
+*** Truncation
+*** Insertion to various places
+*** Reading in clever and unexpected ways
 
 ** Add missing functionality to forest module (e.g. remove API?)
 
@@ -15,12 +20,10 @@
 ** Correct readdir semantics
 
 mutation should not result in non-mutated files being omitted/returned
-twice (this should be trivially given we iterate automatically by
-filename within the tree order?)
+twice (this should be trivially given we iterate automatically by filename
+within the tree order?)
 
 * Pending 2 (before it can be used for ANYTHING); TBD P2 in code
-
-** symlink support
 
 * Pending before it can be used for single-user, multiple-installations
 

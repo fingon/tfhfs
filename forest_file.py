@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Thu Dec 15 14:22:30 2016 mstenber
-# Edit time:     218 min
+# Last modified: Fri Dec 16 05:22:51 2016 mstenber
+# Edit time:     225 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -201,10 +201,18 @@ class FileINode(inode.INode):
         else:
             self._to_interned_data(size)
         _debug('set size to %d', self.size)
+        if self.leaf_node:
+            self.direntry.set_data('st_size', size)
         assert self.size == size
 
     @property
     def size(self):
+        if self.leaf_node:
+            return self.direntry.data.get('st_size', 0)
+        return self.stored_size
+
+    @property
+    def stored_size(self):
         n = self.load_node()
         if n is None:
             bd = self.leaf_node.block_data or b''

@@ -9,15 +9,17 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Wed Dec 14 09:13:38 2016 mstenber
-# Edit time:     130 min
+# Last modified: Fri Dec 16 06:55:26 2016 mstenber
+# Edit time:     133 min
 #
 """
 
 """
 
 import logging
+import os.path
 import sqlite3
+import tempfile
 import unittest
 
 import cryptography.exceptions
@@ -248,6 +250,13 @@ def test_sqlitestorage_get_execute_error(kwargs):
     s._get_execute_result('BLORB', **kwargs)
 
 
+def test_sqlitestorage_available_file():
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, 'x.db')
+        s = SQLiteStorage(filename=path)
+        assert s.get_bytes_available()
+
+
 @pytest.mark.parametrize('storage_attrs, use_flush, backend',
                          [
                              ({}, True, SQLiteStorage),
@@ -265,3 +274,5 @@ def test_delayedstorage(storage_attrs, use_flush, backend):
     for k, v in storage_attrs.items():
         setattr(s, k, v)
     _prod_delayedstorage(s, s2, use_flush and s.flush or _nop)
+    assert s.get_bytes_available() > 0
+    assert s.get_bytes_used() > 0

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:06:01 2016 mstenber
-# Last modified: Thu Dec 15 08:11:28 2016 mstenber
-# Edit time:     13 min
+# Last modified: Fri Dec 16 06:37:25 2016 mstenber
+# Edit time:     16 min
 #
 """
 
@@ -20,6 +20,7 @@ Random utility things.
 
 import hashlib
 import logging
+import sys
 
 import cbor
 
@@ -168,6 +169,23 @@ class CBORPickler:
         for k, v in d.items():
             k2 = self.external2internal_dict[k]
             setattr(o, k2, v)
+
+
+def getrecsizeof(o, seen=None):
+    if seen is None:
+        seen = set()
+    if id(o) in seen:
+        return 0
+    seen.add(id(o))
+    c = sys.getsizeof(o)
+    if isinstance(o, dict):
+        for k, v in o.items():
+            c += getrecsizeof(k, seen)
+            c += getrecsizeof(v, seen)
+    elif isinstance(o, list):
+        for e in o:
+            c += getrecsizeof(e, seen)
+    return c
 
 
 def to_bytes(s):

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Thu Dec 15 22:22:03 2016 mstenber
-# Edit time:     232 min
+# Last modified: Fri Dec 16 06:47:06 2016 mstenber
+# Edit time:     273 min
 #
 """
 
@@ -41,6 +41,7 @@ import os
 import stat
 from errno import EEXIST, ENOATTR, ENOENT, ENOSYS, ENOTEMPTY, EPERM
 
+import const
 import forest_nodes
 import llfuse
 
@@ -135,7 +136,7 @@ class Operations(llfuse.Operations):
         de.set_data('st_uid', ctx.uid)
         de.set_data('st_gid', ctx.gid)
         if mode >= 0:
-            de.set_data('st_mode', mode & ctx.umask)
+            de.set_data('st_mode', mode & ~ctx.umask)
 
     def create(self, parent_inode, name, mode, flags, ctx):
         assert self._initialized
@@ -203,7 +204,7 @@ class Operations(llfuse.Operations):
         assert self._initialized
         assert_or_errno(self.access(new_parent_inode, WX_OK, ctx), EPERM)
         inode = self.forest.get_inode_by_value(inode)
-        assert_or_errno(not inode.leaf_node, ENOSYS)
+        assert_or_errno(not inode.leaf_node, EEXIST)
         parent_inode = self.forest.get_inode_by_value(new_parent_inode)
         n = parent_inode.node.search_name(new_name)
         if n:
@@ -244,7 +245,7 @@ class Operations(llfuse.Operations):
         cn = inode.node.search_name(name)
         assert_or_errno(not cn, EEXIST)
         dir_inode = self.forest.create_dir(inode, name=name,
-                                           mode=(mode & ctx.umask))
+                                           mode=(mode & ~ctx.umask))
         self._set_de_perms_from_mode_ctx(dir_inode.direntry, -1, ctx)
         return self._inode_attributes(dir_inode)
 
@@ -292,7 +293,12 @@ class Operations(llfuse.Operations):
     def readlink(self, inode, ctx):
         assert self._initialized
         assert_or_errno(self.access(inode, os.R_OK, ctx), EPERM)
-        raise llfuse.FUSEError(ENOSYS)  # TBD P2
+        inode = self.forest.get_inode_by_value(inode)
+        fd = self.open(inode.value, os.O_RDONLY, ctx)
+        try:
+            return self.read(fd, 0, inode.size)
+        finally:
+            self.release(fd)
 
     def release(self, fh):
         assert self._initialized
@@ -342,8 +348,23 @@ class Operations(llfuse.Operations):
 
     def setattr(self, inode, attr, fields, fh, ctx):
         assert self._initialized
-        assert_or_errno(self.access(inode, os.W_OK, ctx), EPERM)
-        raise llfuse.FUSEError(ENOSYS)
+        inode = self.forest.get_inode_by_value(inode)
+        de = inode.direntry
+        assert_or_errno(self.access(inode.value, os.W_OK, ctx)
+                        or inode.direntry.uid == ctx.uid, EPERM)
+        if fields.update_uid:
+            assert_or_errno(not ctx.uid, EPERM)
+            de.set_data('st_uid', attr.st_uid)
+        if fields.update_gid:
+            assert_or_errno(not ctx.uid, EPERM)
+            de.set_data('st_gid', attr.st_gid)
+        if fields.update_mtime:
+            de.set_data('st_mtime_ns', attr.st_mtime_ns)
+        if fields.update_mode:
+            de.set_data('st_mode', attr.st_mode)
+        if fields.update_size:
+            inode.set_size(attr.st_size)
+        return self._inode_attributes(inode)
 
     def setxattr(self, inode, name, value, ctx):
         assert self._initialized
@@ -355,12 +376,53 @@ class Operations(llfuse.Operations):
 
     def statfs(self, ctx):
         assert self._initialized
-        raise llfuse.FUSEError(ENOSYS)
+        d = llfuse.StatvfsData()
+        # from man page:
+        # fsblkcnt_t     f_bavail;   /* # free blocks for unprivileged users */
+        # fsblkcnt_t     f_bfree;    /* # free blocks */
+        # fsblkcnt_t     f_blocks;   /* size of fs in f_frsize units */
+        # unsigned long  f_bsize;    /* file system block size */
+        # fsfilcnt_t     f_favail;   /* # free inodes for unprivileged users */
+        # fsfilcnt_t     f_ffree;    /* # free inodes */
+        # fsfilcnt_t     f_files;    /* # inodes */
+        # unsigned long  f_frsize;   /* fragment size */
+
+        # these are so n/a it is not even funny
+        # f_ffree
+        # f_files
+
+        # constants
+        d.f_bsize = const.BLOCK_SIZE_LIMIT
+        d.f_frsize = const.BLOCK_SIZE_LIMIT
+
+        avail = self.forest.storage.get_bytes_available()
+        used = self.forest.storage.get_bytes_used()
+
+        # return st.f_bavail * st.f_frsize / 1024 / 1024
+        d.f_bfree = avail / d.f_frsize
+        d.f_blocks = (avail + used) / d.f_frsize
+
+        # unpriviliged have all resources
+        d.f_bavail = d.f_bfree
+        d.f_favail = d.f_ffree
+
+        return d
 
     def symlink(self, parent_inode, name, target, ctx):
         assert self._initialized
         assert_or_errno(self.access(parent_inode, WX_OK, ctx), EPERM)
-        raise llfuse.FUSEError(ENOSYS)
+        try:
+            self.unlink(parent_inode, name, ctx)
+        except llfuse.FUSEError as e:
+            if e.errno != ENOENT:
+                raise
+        fd, a = self.create(parent_inode, name, stat.S_IFLNK | 0o777,
+                            os.O_WRONLY, ctx)
+        try:
+            self.write(fd, 0, target)
+            return a
+        finally:
+            self.release(fd)
 
     def unlink(self, parent_inode, name, ctx, *, allow_any=False):
         assert self._initialized
@@ -369,6 +431,7 @@ class Operations(llfuse.Operations):
         n = self.forest.lookup(pn, name)
         assert_or_errno(n, ENOENT)
         try:
+            assert_or_errno(self._de_access(n.direntry, os.W_OK, ctx), EPERM)
             assert_or_errno(n.leaf_node.is_file or allow_any, ENOENT)
             pn.node.remove(n.leaf_node)
             n.set_leaf_node(None)

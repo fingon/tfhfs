@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Thu Dec 15 22:19:46 2016 mstenber
-# Edit time:     139 min
+# Last modified: Fri Dec 16 06:45:57 2016 mstenber
+# Edit time:     157 min
 #
 """
 
@@ -39,16 +39,27 @@ from storage import NopBlockCodec, SQLiteStorage, TypedBlockCodec
 _debug = logging.getLogger(__name__).debug
 
 
-class RequestContextIsh:
-    uid = 0
-    pid = 0
-    gid = 0
-    umask = 0o777
+class FakeStruct:
 
     def __init__(self, **kw):
         for k, v in kw.items():
             assert hasattr(self, k)
             setattr(self, k, v)
+
+
+class RequestContextIsh(FakeStruct):
+    uid = 0
+    pid = 0
+    gid = 0
+    umask = 0o077  # self-only by default
+
+
+class SetattrFieldsIsh(FakeStruct):
+    update_uid = False
+    update_gid = False
+    update_mtime = False
+    update_mode = False
+    update_size = False
 
 
 class OpsContext:
@@ -131,6 +142,19 @@ def test_dir(oc):
     l = list(x[0] for x in oc.ops.readdir(fd, 0))
     assert l == [b'root_file_in']
     oc.ops.releasedir(fd)
+
+
+def test_statvfs(oc):
+    r = oc.ops.statfs(oc.rctx_user)
+    assert r.f_blocks
+    assert r.f_bavail
+
+
+def test_symlink(oc):
+    target = b'/user_file'
+    a = oc.ops.symlink(llfuse.ROOT_INODE, b'x', target, oc.rctx_user)
+    assert oc.ops.readlink(a.st_ino, oc.rctx_user) == target
+    oc.ops.forget1(a.st_ino)
 
 
 def test_rename(oc):
@@ -310,3 +334,27 @@ def test_ensure_full_implementation():
     print(vars1, vars2)
     assert vars1.difference(vars2) == set()
     # assert vars2.difference(vars1) == set() # we don't care about extra
+
+
+@pytest.mark.parametrize('filename,is_root,fkb,v', [
+    # uid / gid change as root is ok
+    (b'user_file', True, 'uid', 0),
+    (b'user_file', True, 'gid', 0),
+    pytest.mark.xfail((b'user_file', False, 'uid', 0)),
+    pytest.mark.xfail((b'user_file', False, 'gid', 0)),
+    (b'user_file', False, 'mtime', 42),
+    pytest.mark.xfail((b'root_file', False, 'mtime', 42)),
+    (b'user_file', False, 'mode', 0),
+    (b'user_file', False, 'size', 1),
+])
+def test_setattr(oc, filename, is_root, fkb, v):
+    ctx = is_root and oc.rctx_root or oc.rctx_user
+    fk = 'update_%s' % fkb
+    k = {'uid': 'st_uid', 'gid': 'st_gid', 'mtime': 'st_mtime_ns',
+         'mode': 'st_mode', 'size': 'st_size'}[fkb]
+    f = SetattrFieldsIsh()
+    setattr(f, fk, True)
+    a = llfuse.EntryAttributes()
+    setattr(a, k, v)
+    a = oc.ops.setattr(oc.inodes[filename], a, f, 0, ctx)
+    assert getattr(a, k) == v
