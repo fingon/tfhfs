@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jul  2 21:10:04 2016 mstenber
-# Last modified: Thu Dec 15 14:20:35 2016 mstenber
+# Last modified: Fri Dec 16 07:14:57 2016 mstenber
 # Edit time:     19 min
 #
 """
@@ -67,5 +67,5 @@ ATTR_KEYS = ['attr_timeout', 'entry_timeout', 'generation',
              # these are all n/a, we do not care
              ] + ATTR_STAT_KEYS
 
-FS_ROOT_MODE = 0o777
+FS_ROOT_MODE = 0o777 | stat.S_IFDIR
 FS_ROOT_UID = 0
