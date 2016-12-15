@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Thu Dec 15 08:06:50 2016 mstenber
-# Edit time:     88 min
+# Last modified: Thu Dec 15 13:37:04 2016 mstenber
+# Edit time:     102 min
 #
 """
 
@@ -24,6 +24,7 @@ would make sense.
 """
 
 import errno
+import logging
 import os
 
 import pytest
@@ -34,6 +35,20 @@ import llfuse
 import ops
 from storage import NopBlockCodec, SQLiteStorage, TypedBlockCodec
 
+_debug = logging.getLogger(__name__).debug
+
+
+class RequestContextIsh:
+    uid = 0
+    pid = 0
+    gid = 0
+    umask = 0o777
+
+    def __init__(self, **kw):
+        for k, v in kw.items():
+            assert hasattr(self, k)
+            setattr(self, k, v)
+
 
 class OpsContext:
 
@@ -42,33 +57,32 @@ class OpsContext:
         storage = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
         f = forest.Forest(storage, llfuse.ROOT_INODE)
         self.ops = ops.Operations(f)
-        self.rctx_root = llfuse.RequestContext()
-        self.rctx_user = llfuse.RequestContext(uid=42, gid=7, pid=123)
+        self.rctx_root = RequestContextIsh()
+        self.rctx_user = RequestContextIsh(uid=42, gid=7, pid=123)
         self.ops.init()
 
-        # Create user-owned directory + file
+        # Create root-owned directory + file
         self.mkdir(llfuse.ROOT_INODE, b'root_dir', self.rctx_root)
         self.create(llfuse.ROOT_INODE, b'root_file', self.rctx_root,
                     data=b'root')
 
-        # Create root-owned directory + file
+        # Create user-owned directory + file
         self.mkdir(llfuse.ROOT_INODE, b'user_dir', self.rctx_user)
         self.create(llfuse.ROOT_INODE, b'user_file', self.rctx_user,
                     data=b'user')
 
-    def create(self, parent_inode, name, ctx, *, mode=0, flags=0, data=b''):
+    def create(self, parent_inode, name, ctx, *,
+               mode=0o600, flags=os.O_WRONLY, data=b''):
         r = self.ops.create(parent_inode, name, mode, flags, ctx)
         (fd, attr) = r
         assert isinstance(attr, llfuse.EntryAttributes)
         self.inodes[name] = attr.st_ino
-
         if data:
             r = self.ops.write(fd, 0, data)
             assert r == len(data)
-
         self.ops.release(fd)
 
-    def mkdir(self, parent_inode, name, ctx, *, mode=0):
+    def mkdir(self, parent_inode, name, ctx, *, mode=0o700):
         attr = self.ops.mkdir(parent_inode, name, mode, ctx)
         assert isinstance(attr, llfuse.EntryAttributes)
         self.inodes[name] = attr.st_ino
@@ -103,7 +117,6 @@ def test_lookup(oc):
     oc.ops.forget([(a4.st_ino, 1), (a.st_ino, 3)])
 
 
-@pytest.mark.xfail(raises=llfuse.FUSEError)
 @pytest.mark.parametrize('filename,is_root,expect_success', [
     (b'root_dir', True, True),
     (b'root_dir', False, False),
@@ -118,6 +131,7 @@ def test_lookup(oc):
 ])
 def test_access(oc, filename, is_root, expect_success):
     ctx = is_root and oc.rctx_root or oc.rctx_user
+    _debug('is_root:%s uid:%d', is_root, ctx.uid)
     r = oc.ops.access(oc.inodes[filename], os.R_OK, ctx)
     assert r == expect_success
 
@@ -141,11 +155,11 @@ def test_flush(oc):
 
 @pytest.mark.xfail(raises=llfuse.FUSEError)
 def test_basic_file_io(oc):
-    r = oc.ops.create(llfuse.ROOT_INODE, b'x', 0, 0, oc.rctx_root)
+    r = oc.ops.create(llfuse.ROOT_INODE, b'x', 0, os.O_WRONLY, oc.rctx_root)
     (fh, attr) = r
     assert isinstance(attr, llfuse.EntryAttributes)
 
-    fd = oc.ops.open(attr.st_ino, 0, oc.rctx_root)
+    fd = oc.ops.open(attr.st_ino, os.O_RDONLY, oc.rctx_root)
     assert isinstance(fd, int)
 
     oc.ops.fsyncdir(llfuse.ROOT_INODE, False)

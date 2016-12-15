@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Thu Dec 15 07:20:52 2016 mstenber
-# Edit time:     210 min
+# Last modified: Thu Dec 15 13:48:14 2016 mstenber
+# Edit time:     216 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -132,12 +132,13 @@ class FileINode(inode.INode):
     def load_node(self):
         if self.node is None:
             ln = self.leaf_node
-            bid = ln.block_id
-            if bid:
-                if ln.mode & const.DENTRY_MODE_MINIFILE:
-                    self.set_node(FileData(self.store, bid, None))
-                else:
-                    self.set_node(FileBlockTreeNode(self.store, bid))
+            if ln:
+                bid = ln.block_id
+                if bid:
+                    if ln.mode & const.DENTRY_MODE_MINIFILE:
+                        self.set_node(FileData(self.store, bid, None))
+                    else:
+                        self.set_node(FileBlockTreeNode(self.store, bid))
         return self.node
 
     def open(self, flags):
@@ -191,7 +192,7 @@ class FileINode(inode.INode):
         if size > const.BLOCK_SIZE_LIMIT:
             # Should be node tree, or convert to one
             self._to_block_tree(size)
-        elif size > const.INTERNED_BLOCK_DATA_SIZE_LIMIT:
+        elif size > const.INTERNED_BLOCK_DATA_SIZE_LIMIT or not self.leaf_node:
             self._to_block_data(size)
         else:
             self._to_interned_data(size)
@@ -288,8 +289,9 @@ class FileINode(inode.INode):
         _debug('_to_block_data %d', size)
         s = self._read(0, size, pad=True)
         ln = self.leaf_node
-        ln.set_clear_mode_bits(const.DENTRY_MODE_MINIFILE, 0)
-        ln.set_block_data(None)
+        if ln:
+            ln.set_clear_mode_bits(const.DENTRY_MODE_MINIFILE, 0)
+            ln.set_block_data(None)
         self.set_node(FileData(self.store, None, s))
 
     def _to_interned_data(self, size):
@@ -320,3 +322,12 @@ class FileINode(inode.INode):
         size = min(size, const.BLOCK_SIZE_LIMIT - ofs)
         _debug(' => size %d', size)
         return k, ofs, size
+
+    @property
+    def _leaf_interned_block_data(self):
+        return self.leaf_node and self.leaf_node.block_data
+
+    def set_leaf_node(self, node):
+        if node is None and self.leaf_node and self._leaf_interned_block_data:
+            self._to_block_data(self.size)
+        inode.INode.set_leaf_node(self, node)

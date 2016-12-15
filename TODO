@@ -2,23 +2,7 @@
 
 * Pending (before it can be used for ANYTHING)
 
-** Implement files sensibly
-
-This will allow us to skip _lots_ of intermediate _files_ so it is
-important, while we are opting more on the side of correctness than
-efficiency.
-
-Options for a file:
-
-- block_data = upto N bytes stored in-place (I am tempted to keep this at
-  smallish values, e.g. 100 bytes)
-
-- single-block file = just one data block, no tree of blocks; up to maximum
-  size of block (100k-ish?)
-
-- tree of data blocks
-
-*** Check/test
+** Check/test
 
 **** Truncation
 **** Insertion to various places
@@ -38,10 +22,6 @@ filename within the tree order?)
 * Pending before it can be used for single-user, multiple-installations
 
 ** Implement tree sync code (SHOULD be straightforward, but who knows)
-
-* Pending before it can be used for multi-user
-
-** Implement permission handling
 
 * Pending (eventually)
 

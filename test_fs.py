@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Thu Dec 15 07:25:27 2016 mstenber
-# Edit time:     106 min
+# Last modified: Thu Dec 15 13:44:20 2016 mstenber
+# Edit time:     108 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -230,8 +230,6 @@ def test_file_content(modesuffix, content, count):
     assert mfs.os_listdir('/') == []
 
 
-#@pytest.mark.xfail(raises=llfuse.FUSEError, reason='pending code')
-@pytest.mark.xfail(raises=NotImplementedError)
 def test_unlink_behavior():
     """ This is based on the 'gotchas' in llfuse documentation. """
     mfs = MockFS()

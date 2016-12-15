@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Thu Dec 15 07:23:03 2016 mstenber
-# Edit time:     34 min
+# Last modified: Thu Dec 15 13:44:57 2016 mstenber
+# Edit time:     39 min
 #
 """
 
@@ -30,6 +30,7 @@ INodes are assumed to be stored in a tree which looks like this:
 
 import logging
 
+import const
 from btree import LeafNode, TreeNode
 from forest_nodes import DirectoryEntry
 
@@ -147,6 +148,8 @@ class INode:
         n = self.node.search_name(b'')
         if n is None:
             n = DirectoryEntry(self.node.forest, name=b'')
+            n.set_data('st_mode', const.FS_ROOT_MODE)
+            n.set_data('st_uid', const.FS_ROOT_UID)
             self.node.add_child(n)
         return n
 
@@ -165,6 +168,21 @@ class INode:
             self.store.get_inode_by_node(self.leaf_node.root).deref()
         # Remove from the store
         self.store._unregister_inode(self)
+
+    def set_leaf_node(self, node):
+        if self.leaf_node is node:
+            return
+        _debug('%s leaf_node = %s' % (self, node))
+        assert node not in self.store._lnode2inode
+        if self.leaf_node:
+            self.leaf_node.mark_dirty()
+            del self.store._lnode2inode[self.leaf_node]
+            self.leaf_node.set_block_id(None)
+        self.leaf_node = node
+        if node:
+            self.store._lnode2inode[node] = self
+            # The node we are associated is dirty .. by association.
+            self.leaf_node.mark_dirty()
 
     def set_node(self, node):
         if self.node is node:
