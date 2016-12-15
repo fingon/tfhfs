@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Fri Dec 16 07:32:51 2016 mstenber
-# Edit time:     563 min
+# Last modified: Fri Dec 16 08:00:42 2016 mstenber
+# Edit time:     564 min
 #
 """This is the 'forest layer' main module.
 
@@ -40,6 +40,7 @@ particular (file) inode.
 
 import logging
 import stat
+import time
 
 import const
 import inode
@@ -102,17 +103,22 @@ class Forest(inode.INodeStore, FDStore):
         if node:
             node.mark_dirty()
         leaf.set_data('st_mode', mode)
+        t = int(time.time() * 1e9)
+        leaf.set_data('st_ctime_ns', t)
+        leaf.set_data('st_mtime_ns', t)
         return inode
 
     def create_dir(self, dir_inode, name, *, mode=0):
         if not stat.S_IFMT(mode):
             mode |= stat.S_IFDIR
+        dir_inode.changed()
         _debug('create_dir %s 0x%x', name, mode)
         return self._create(mode, dir_inode, name)
 
     def create_file(self, dir_inode, name, *, mode=0):
         if not stat.S_IFMT(mode):
             mode |= stat.S_IFREG
+        dir_inode.changed()
         _debug('create_file %s 0x%x', name, mode)
         return self._create(mode, dir_inode, name)
 

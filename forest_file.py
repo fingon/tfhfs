@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Fri Dec 16 05:22:51 2016 mstenber
-# Edit time:     225 min
+# Last modified: Fri Dec 16 08:00:19 2016 mstenber
+# Edit time:     226 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -239,6 +239,7 @@ class FileINode(inode.INode):
             wrote = self._write(ofs + done, buf[done:])
             done += wrote
         _debug('wrote %d total to %d', done, ofs)
+        self.changed()
         return done
 
     def _write(self, ofs, buf):

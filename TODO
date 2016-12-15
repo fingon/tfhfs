@@ -2,6 +2,10 @@
 
 * Pending (before it can be used for ANYTHING)
 
+** Refactor the inode allocation to work like fd allocation - reusing numbers
+
+(Same utility mixin superclass / contained object?)
+
 ** Ensure that the block_data_references gets actually called
 
 .. it is TBD why the current code even works, and it clearly does NOT clean

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Fri Dec 16 07:43:04 2016 mstenber
-# Edit time:     283 min
+# Last modified: Fri Dec 16 08:21:41 2016 mstenber
+# Edit time:     294 min
 #
 """
 
@@ -78,13 +78,21 @@ class Operations(llfuse.Operations):
 
     def _leaf_attributes(self, leaf_node):
         entry = llfuse.EntryAttributes()
-        for attr in ('st_mode', 'st_nlink', 'st_uid', 'st_gid',
-                     'st_rdev', 'st_size', 'st_atime_ns', 'st_mtime_ns',
+        entry.st_nlink = 1
+        entry.generation = 0
+        entry.entry_timeout = 5
+        entry.attr_timeout = 5
+        # 'st_nlink',  # fixed
+        # 'st_atime_ns',  # never provided
+        for attr in ('st_mode', 'st_uid', 'st_gid',
+                     'st_rdev', 'st_size', 'st_mtime_ns',
                      'st_ctime_ns'):
             v = leaf_node.data.get(attr)
             if v is not None:
                 _debug('%s = %s', attr, v)
                 setattr(entry, attr, v)
+        entry.st_blksize = const.BLOCK_SIZE_LIMIT
+        entry.st_blocks = max(0, (entry.st_size - 1)) // entry.st_blksize + 1
         return entry
 
     def _inode_attributes(self, inode):
@@ -276,16 +284,27 @@ class Operations(llfuse.Operations):
 
     def readdir(self, fh, off):
         assert self._initialized
-        inode = self.forest.get_inode_by_value(fh)
+        dir_inode = self.forest.get_inode_by_value(fh)
         pln = None
-        for i, ln in enumerate(inode.node.get_leaves(), 1):
+        for i, ln in enumerate(dir_inode.node.get_leaves(), 1):
             # Additions may screw up the tree bit
             if (pln is not None and pln.key > ln.key) or not ln.name:
                 pass
             else:
                 pln = ln
                 if i > off:
-                    t = (ln.name, self._leaf_attributes(ln), i)
+                    a = self._leaf_attributes(ln)
+                    t = (ln.name, a, i)
+                    # If we already have inode for this, we can use it.
+                    # If not, we synthesize one that is highly unique
+                    # but not really usable anywhere elsewhere (sigh)
+                    inode = self.forest.getdefault_inode_by_leaf_node(ln)
+                    if inode:
+                        a.st_ino = inode.value
+                    else:
+                        sbits = self.forest.first_free_inode.bit_length() + 1
+                        a.st_ino = (i << sbits) | dir_inode.value
+                    assert a.st_ino  # otherwise not visible in e.g. ls!
                     yield t
 
     def readlink(self, inode, ctx):

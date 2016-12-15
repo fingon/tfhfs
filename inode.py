@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Fri Dec 16 05:17:34 2016 mstenber
-# Edit time:     40 min
+# Last modified: Fri Dec 16 08:06:44 2016 mstenber
+# Edit time:     43 min
 #
 """
 
@@ -29,6 +29,7 @@ INodes are assumed to be stored in a tree which looks like this:
 """
 
 import logging
+import time
 
 import const
 from btree import LeafNode, TreeNode
@@ -128,6 +129,10 @@ class INode:
 
     def __repr__(self):
         return '<INode #%d - n:%s ln:%s>' % (self.value, self.node, self.leaf_node)
+
+    def changed(self):
+        if self.leaf_node or (self.node and isinstance(self.node, TreeNode)):
+            self.direntry.set_data('st_mtime_ns', int(time.time() * 1e9))
 
     def deref(self, count=1):
         assert count > 0
