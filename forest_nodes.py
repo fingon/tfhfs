@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Fri Dec 16 07:37:30 2016 mstenber
-# Edit time:     37 min
+# Last modified: Fri Dec 16 09:07:07 2016 mstenber
+# Edit time:     44 min
 #
 """
 
@@ -61,6 +61,10 @@ class LoadedTreeNode(DirtyMixin, btree.TreeNode):
 
     def create(self):
         return self.__class__(self.forest)
+
+    def get_block_ids(self):
+        for child in self.children:
+            yield child.block_id
 
     @property
     def is_loaded(self):
@@ -231,6 +235,7 @@ class FileBlockTreeNode(LoadedTreeNode):
 
 
 class FileData(DirtyMixin):
+    entry_type = const.TYPE_FILEDATA
 
     def __init__(self, forest, block_id, block_data):
         self.forest = forest
@@ -244,12 +249,12 @@ class FileData(DirtyMixin):
         if self.block_data is None:
             data = self.forest.storage.get_block_data_by_id(self.block_id)
             (t, d) = data
-            assert t == const.TYPE_FILEDATA
+            assert t == self.entry_type
             self.block_data = d
         return self.block_data
 
     def perform_flush(self, *, in_inode=True):
-        bd = (const.TYPE_FILEDATA, self.block_data)
+        bd = (self.entry_type, self.block_data)
         bid = sha256(*bd)
         if self.block_id == bid:
             return
@@ -260,3 +265,21 @@ class FileData(DirtyMixin):
             # we SHOULD be fine, as we are INode.node
             # -> block_id does not disappear even in refcnt 0 immediately.
         return True
+
+
+def any_node_block_data_references_callback(block_data):
+    (rt, d) = block_data
+    t = rt & const.TYPE_MASK
+
+    if t == const.TYPE_DIRNODE:
+        n = DirectoryTreeNode(None)
+        n.load_from_data(block_data)
+    elif t == const.TYPE_FILENODE:
+        n = FileBlockTreeNode(None)
+        n.load_from_data(block_data)
+    elif t == const.TYPE_FILEDATA:
+        return
+    else:
+        assert False, 'unsupported type #%d' % t
+    assert isinstance(n, LoadedTreeNode)
+    yield from n.get_block_ids()

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Fri Dec 16 08:00:42 2016 mstenber
-# Edit time:     564 min
+# Last modified: Fri Dec 16 09:01:44 2016 mstenber
+# Edit time:     570 min
 #
 """This is the 'forest layer' main module.
 
@@ -42,10 +42,10 @@ import logging
 import stat
 import time
 
-import const
 import inode
 from forest_file import FDStore, FileINode
-from forest_nodes import DirectoryTreeNode, FileBlockTreeNode, FileData
+from forest_nodes import (DirectoryTreeNode, FileBlockTreeNode, FileData,
+                          any_node_block_data_references_callback)
 
 _debug = logging.getLogger(__name__).debug
 
@@ -72,6 +72,8 @@ class Forest(inode.INodeStore, FDStore):
         self.storage = storage
         self.storage.set_block_id_has_references_callback(
             self.inode_has_block_id)
+        self.storage.set_block_data_references_callback(
+            any_node_block_data_references_callback)
         self.init()
 
     def init(self):

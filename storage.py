@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Fri Dec 16 08:51:32 2016 mstenber
+# Last modified: Fri Dec 16 09:05:13 2016 mstenber
 # Edit time:     392 min
 #
 """This is the 'storage layer' main module.
@@ -187,7 +187,8 @@ class Storage:
         (block_data, block_refcnt) = r
         assert block_data
         for block_id2 in self.get_block_data_references(block_data):
-            self.release_block(block_id2)
+            if block_id2:
+                self.release_block(block_id2)
         self.delete_block_id(block_id)
         return True
 
@@ -221,8 +222,9 @@ set, None is returned."""
 
     def on_add_block_data(self, block_data):
         for block_id in self.get_block_data_references(block_data):
-            _debug('on_add_block_data add reference to %s', block_id)
-            self.refer_block(block_id)
+            if block_id:
+                _debug('on_add_block_data add reference to %s', block_id)
+                self.refer_block(block_id)
 
     def refer_block(self, block_id):
         r = self.get_block_by_id(block_id)
