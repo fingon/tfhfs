@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Jul  5 11:49:58 2016 mstenber
-# Last modified: Fri Dec 16 08:04:00 2016 mstenber
-# Edit time:     73 min
+# Last modified: Sun Dec 18 20:06:11 2016 mstenber
+# Edit time:     74 min
 #
 """
 
@@ -22,7 +22,7 @@ import logging
 import stat
 
 import forest
-from storage import NopBlockCodec, SQLiteStorage, TypedBlockCodec
+from storage import DictStorage
 
 _debug = logging.getLogger(__name__).debug
 
@@ -34,7 +34,7 @@ class LeafierDirectoryTreeNode(forest.DirectoryTreeNode):
 
 
 def testforest():
-    storage = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
+    storage = DictStorage()
     f = forest.Forest(storage, 42)
     root = f.get_inode_by_value(42)
     assert root
@@ -51,8 +51,6 @@ def testforest():
 
     assert f.root.node.search_name(b'foo') == file_parent
 
-    storage2 = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
-    storage2.conn = storage.conn
     f2 = forest.Forest(storage, 42)
     assert not f2.root.node.dirty
     assert f2.lookup(f2.root, b'nonexistent') is None
@@ -89,7 +87,7 @@ def testforest():
 
 
 def test_deepforest():
-    storage = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
+    storage = DictStorage()
     f = forest.Forest(storage, 42)
     parent_inode = f.root
     test_depth = 10
@@ -99,8 +97,6 @@ def test_deepforest():
     parent_inode.leaf_node.set_data('foo', 42)
     f.flush()
 
-    storage2 = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
-    storage2.conn = storage.conn
     f2 = forest.Forest(storage, 42)
     parent_inode = f2.root
     for i in range(test_depth):
@@ -110,7 +106,7 @@ def test_deepforest():
 
 
 def test_wideforest():
-    storage = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
+    storage = DictStorage()
     f = forest.Forest(storage, 42)
     f.directory_node_class = LeafierDirectoryTreeNode
     test_count = 100
@@ -118,8 +114,6 @@ def test_wideforest():
         inode = f.create_dir(f.root, name=b'foo%d' % i)
     f.flush()
 
-    storage2 = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
-    storage2.conn = storage.conn
     f2 = forest.Forest(storage, 7)
     for i in range(test_count):
         inode = f2.lookup(f2.root, b'foo%d' % i)
