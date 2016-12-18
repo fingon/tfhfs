@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Sun Dec 18 21:55:58 2016 mstenber
-# Edit time:     70 min
+# Last modified: Sun Dec 18 22:16:22 2016 mstenber
+# Edit time:     72 min
 #
 """
 
@@ -145,12 +145,14 @@ class LoadedTreeNode(DirtyMixin, btree.TreeNode):
         return (t, self.content_pickler.dumps(self))
 
     def unload_if_possible(self, protected_set):
-        if self in protected_set:
-            return
         if not self._loaded or self.dirty:
+            # subtree not applicable
             return
         for child in self.children:
             child.unload_if_possible(protected_set)
+        if self in protected_set:
+            # if we are protected, _we_ are not applicable
+            return
         self.__init__(self.forest, self.block_id)
         del self._loaded
         _debug('unloaded %s', self)
@@ -289,6 +291,9 @@ class FileData(DirtyMixin):
             # -> block_id does not disappear even in refcnt 0 immediately.
         del self.block_data
         return True
+
+    def unload_if_possible(self, protected_set):
+        pass
 
 
 def any_node_block_data_references_callback(block_data):
