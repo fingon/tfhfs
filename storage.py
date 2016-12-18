@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Fri Dec 16 09:05:13 2016 mstenber
-# Edit time:     392 min
+# Last modified: Mon Dec 19 06:33:16 2016 mstenber
+# Edit time:     401 min
 #
 """This is the 'storage layer' main module.
 
@@ -72,10 +72,9 @@ data within.."""
     iv_len = 16
     tag_len = 16
 
-    def __init__(self, password):
+    def __init__(self, password, salt=b''):
         self.backend = default_backend()
         # TBD: is empty salt ever ok? :p
-        salt = b''
         kdf = PBKDF2HMAC(algorithm=hashes.SHA256(),
                          length=32,
                          salt=salt,

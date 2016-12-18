@@ -51,6 +51,14 @@ so the remoting will have two modes:
 
 * Pending (eventually)
 
+** Security improvements
+
+*** Add support for rewriting block ids (e.g. encode_id, decode_id) on the way to disk as well.
+
+Currently, the block ids are actually based on the plaintext, but design
+does not really force it (just current implementation limitation). Using
+encrypted block ids would be better.
+
 ** Consider if CBORPickler should also support e.g. IntEnum as argument
 
 ** Work out how sharing of storage backends works

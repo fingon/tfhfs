@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Fri Dec 16 08:41:17 2016 mstenber
-# Edit time:     123 min
+# Last modified: Mon Dec 19 06:44:19 2016 mstenber
+# Edit time:     135 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -28,7 +28,7 @@ import const
 import forest
 import llfuse
 import ops
-from storage import DictStorage
+import storage as st
 from util import to_bytes
 
 _debug = logging.getLogger(__name__).debug
@@ -89,7 +89,7 @@ class MockFile:
 class MockFS:
 
     def __init__(self, *, storage=None):
-        storage = storage or DictStorage()
+        storage = storage or st.DictStorage()
         self.forest = forest.Forest(storage, llfuse.ROOT_INODE)
         self.ops = ops.Operations(self.forest)
         self.rctx_root = llfuse.RequestContext()
@@ -277,16 +277,50 @@ def test_huge_file():
 
 if __name__ == '__main__':
     # TBD - argument parsing?
-    logging.basicConfig(level=logging.DEBUG)
-    storage = DictStorage()
+    import argparse
+    p = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    p.add_argument('--cache-size', type=int, default=1024**3,
+                   help='Maximum cache size used by storage')
+    p.add_argument('--dirty-size', type=int, default=1024**2,
+                   help='Maximum dirty size used by storage')
+    p.add_argument('--debug', action='store_true', help='Enable debugging')
+    p.add_argument(
+        '--filename', '-f',
+        help='Filename to store the data in')
+    p.add_argument('--mountpoint', '-m',
+                   default='/tmp/x',
+                   help='Where the file should be mounted')
+    p.add_argument('--salt', help='Salt to use')
+    p.add_argument(
+        '--password', '-p',
+        help='Program to get the password from for encryption')
+    args = p.parse_args()
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
+    if args.filename:
+        if args.password:
+            password = os.popen(args.password, 'r').read().strip().encode()
+            salt = args.salt and args.salt.encode() or b''
+            codec = st.ConfidentialBlockCodec(password, salt)
+        else:
+            codec = st.NopBlockCodec()
+        codec = st.TypedBlockCodec(codec)
+        storage = st.DelayedStorage(st.SQLiteStorage(codec=codec,
+                                                     filename=args.filename))
+        storage.maximum_cache_size = args.cache_size
+        storage.maximum_dirty_size = args.dirty_size
 
+    else:
+        storage = st.DictStorage()
     forest = forest.Forest(storage, llfuse.ROOT_INODE)
     ops = ops.Operations(forest)
     fuse_options = set(llfuse.default_options)
     fuse_options.remove('nonempty')  # TBD..
     fuse_options.add('fsname=test_fs')
-    fuse_options.add('debug')  # ?
-    llfuse.init(ops, '/tmp/x', fuse_options)
+    if args.debug:
+        fuse_options.add('debug')
+    llfuse.init(ops, args.mountpoint, fuse_options)
     try:
         llfuse.main(workers=1)
     except:
