@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Fri Dec 16 08:06:44 2016 mstenber
-# Edit time:     43 min
+# Last modified: Sun Dec 18 22:02:13 2016 mstenber
+# Edit time:     50 min
 #
 """
 
@@ -74,6 +74,20 @@ class INodeStore:
     def get_inode_by_value(self, value):
         assert isinstance(value, int)
         return self._value2inode[value]
+
+    def get_protected_set(self):
+        # Every active inode and their path to root is sacrosanct and
+        # should not be unloaded (in theory, we could unload non-dirty
+        # ones but it does not seem worth it)
+        protected_set = set()
+        for inode in self._value2inode.values():
+            ln = inode.leaf_node
+            while ln is not None:
+                protected_set.add(ln)
+                ln = ln.parent
+        _debug('get_protected_set => %d nodes for %d inodes',
+               len(protected_set), len(self._node2inode))
+        return protected_set
 
     def getdefault_inode_by_node(self, node, default=None):
         return self._node2inode.get(node, default)

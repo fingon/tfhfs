@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Sun Dec 18 20:13:45 2016 mstenber
-# Edit time:     47 min
+# Last modified: Sun Dec 18 21:55:58 2016 mstenber
+# Edit time:     70 min
 #
 """
 
@@ -18,11 +18,14 @@ These are the btree node subclasses employed by the Forest class.
 
 """
 
+import logging
 import stat
 
 import btree
 import const
 from util import CBORPickler, DataMixin, DirtyMixin, sha256
+
+_debug = logging.getLogger(__name__).debug
 
 
 class LoadedTreeNode(DirtyMixin, btree.TreeNode):
@@ -141,6 +144,17 @@ class LoadedTreeNode(DirtyMixin, btree.TreeNode):
             t = t | const.BIT_LEAFY
         return (t, self.content_pickler.dumps(self))
 
+    def unload_if_possible(self, protected_set):
+        if self in protected_set:
+            return
+        if not self._loaded or self.dirty:
+            return
+        for child in self.children:
+            child.unload_if_possible(protected_set)
+        self.__init__(self.forest, self.block_id)
+        del self._loaded
+        _debug('unloaded %s', self)
+
 
 class NamedLeafNode(DataMixin, btree.LeafNode):
     pickler = CBORPickler(dict(name=0x21,
@@ -186,6 +200,11 @@ class NamedLeafNode(DataMixin, btree.LeafNode):
         if self.block_id:
             self.forest.storage.release_block(self.block_id)
         self.block_id = block_id
+
+    def unload_if_possible(self, protected_set):
+        inode = self.forest.getdefault_inode_by_leaf_node(self)
+        if inode and inode.node:
+            inode.node.unload_if_possible(protected_set)
 
 
 class DirectoryEntry(NamedLeafNode):

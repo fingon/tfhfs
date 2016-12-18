@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Fri Dec 16 09:01:44 2016 mstenber
-# Edit time:     570 min
+# Last modified: Sun Dec 18 21:58:43 2016 mstenber
+# Edit time:     574 min
 #
 """This is the 'forest layer' main module.
 
@@ -148,6 +148,11 @@ class Forest(inode.INodeStore, FDStore):
         # caching LRU criteria, have to think about it)
         self.remove_old_inodes()
 
+        # Similarly, we can do unloading of nodes that are not needed
+        # (the storage should cache what we need anyway, and it is
+        # much more efficient in terms of memory usage than raw Python
+        # data structures)
+        self.unload_nonprotected_nodes()
         return rv
 
     def inode_has_block_id(self, block_id):
@@ -182,3 +187,7 @@ class Forest(inode.INodeStore, FDStore):
         n = FileData(self, None, d)
         n.perform_flush(in_inode=False)
         return n.block_id
+
+    def unload_nonprotected_nodes(self):
+        protected_set = self.get_protected_set()
+        self.root.node.unload_if_possible(protected_set)
