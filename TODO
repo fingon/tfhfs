@@ -10,6 +10,16 @@
 
 - if whole subtree is non-dirty, we could in theory just drop it..
 
+ - most of the forest should NOT be dirty. so even brute force traversal
+   could be fine in the 'OOM-ish' case where we know we have too many
+   nodes.
+
+ - alternatively we can keep track of dirty nodes
+
+ no matter what is chosen, something should be done as _all_ Python
+ structures of a large filesystem may be ~millions+ of items -> some
+ cleanup has to be possible
+
 ** Check/test
 
 *** Truncation
