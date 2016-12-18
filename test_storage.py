@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Fri Dec 16 08:42:47 2016 mstenber
-# Edit time:     134 min
+# Last modified: Sun Dec 18 20:01:38 2016 mstenber
+# Edit time:     137 min
 #
 """
 
@@ -257,19 +257,21 @@ def test_sqlitestorage_available_file():
         assert s.get_bytes_available()
 
 
-@pytest.mark.parametrize('storage_attrs, use_flush, backend',
+@pytest.fixture(params=['sqlite', 'dict'])
+def backend(request):
+    return {'sqlite': SQLiteStorage, 'dict': DictStorage}[request.param]()
+
+
+@pytest.mark.parametrize('storage_attrs, use_flush',
                          [
-                             ({}, True, SQLiteStorage),
-                             ({}, True, DictStorage),
-                             ({'maximum_cache_size': 1}, True,
-                              DictStorage),  # no cache
-                             ({'maximum_dirty_size': 1},  True,
-                              DictStorage
-                              ),  # no dirty
-                             ({}, False, DictStorage),
+                             ({}, True),
+                             ({}, True),
+                             ({'maximum_cache_size': 1}, True),  # no cache
+                             ({'maximum_dirty_size': 1},  True),  # no dirty
+                             ({}, False),
                          ])
 def test_delayedstorage(storage_attrs, use_flush, backend):
-    s2 = backend()
+    s2 = backend
     s = DelayedStorage(s2)
     for k, v in storage_attrs.items():
         setattr(s, k, v)
