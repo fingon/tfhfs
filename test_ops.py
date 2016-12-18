@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Fri Dec 16 07:20:36 2016 mstenber
-# Edit time:     161 min
+# Last modified: Sun Dec 18 19:47:37 2016 mstenber
+# Edit time:     183 min
 #
 """
 
@@ -34,7 +34,7 @@ import const
 import forest
 import llfuse
 import ops
-from storage import NopBlockCodec, SQLiteStorage, TypedBlockCodec
+from storage import DictStorage
 
 _debug = logging.getLogger(__name__).debug
 
@@ -66,7 +66,7 @@ class OpsContext:
 
     def __init__(self):
         self.inodes = {b'.': llfuse.ROOT_INODE}
-        storage = SQLiteStorage(codec=TypedBlockCodec(NopBlockCodec()))
+        storage = DictStorage()
         self.forest = forest.Forest(storage, llfuse.ROOT_INODE)
         self.ops = ops.Operations(self.forest)
         self.rctx_root = RequestContextIsh()
@@ -102,6 +102,48 @@ class OpsContext:
         assert stat.S_ISREG(attr.st_mode)
         self.ops.release(fd)
 
+    def ensure_storage_matches_forest(self):
+        f2 = forest.Forest(self.forest.storage, llfuse.ROOT_INODE)
+        ops2 = ops.Operations(f2).init()
+        todo = [(b'.',
+                 self.ops.lookup(llfuse.ROOT_INODE, b'.', self.rctx_root),
+                 ops2.lookup(llfuse.ROOT_INODE, b'.', self.rctx_root))]
+        while todo:
+            p, a1, a2 = todo.pop()
+            _debug('considering %s', p)
+            ad1 = attr_to_dict(a1)
+            ad2 = attr_to_dict(a2)
+            ad1.pop('st_ino')
+            ad2.pop('st_ino')
+            _debug(' ad1: %s', ad1)
+            _debug(' ad2: %s', ad2)
+            inode1 = self.forest.get_inode_by_value(a1.st_ino)
+            inode2 = f2.get_inode_by_value(a2.st_ino)
+            # TBD: What needs to be popped?
+            assert ad1 == ad2
+            if stat.S_ISDIR(a1.st_mode):
+                # Moar TODO to be had! Yay
+                for (n1, na1, o1), (n2, na2, o2) in zip(self.ops.readdir(a1.st_ino, 0),
+                                                        ops2.readdir(a2.st_ino, 0)):
+                    assert n1 == n2
+                    na1 = self.ops.lookup(a1.st_ino, n1, self.rctx_root)
+                    na2 = ops2.lookup(a2.st_ino, n2, self.rctx_root)
+                    todo.append((b'%s/%s' % (p, n1), na1, na2))
+            elif stat.S_ISREG(a1.st_mode):
+                # Ensure that what we know underneath matches direntry..
+                s = inode1.size
+                assert s == inode2.size
+                assert s == inode1.stored_size
+                assert s == inode2.stored_size
+                if s <= 10 * const.BLOCK_SIZE_LIMIT:
+                    assert inode1.read(0, s) == inode2.read(0, s)
+                else:
+                    assert inode1.read(0, 1) == inode2.read(0, 1)
+                    assert inode1.read(s // 2, 1) == inode2.read(s // 2, 1)
+                    assert inode1.read(s - 1, 1) == inode2.read(s - 1, 1)
+            self.ops.forget1(a1.st_ino)
+            ops2.forget1(a2.st_ino)
+
     def get_inode_counts(self):
         d = {}
         for n, inode in self.forest._value2inode.items():
@@ -125,6 +167,7 @@ def oc():
     assert not r.forest.fd2o
     post_counts = r.get_inode_counts()
     assert pre_counts == post_counts
+    r.ensure_storage_matches_forest()
     r.ops.destroy()
 
 

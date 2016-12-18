@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Fri Dec 16 08:21:41 2016 mstenber
-# Edit time:     294 min
+# Last modified: Sun Dec 18 19:45:52 2016 mstenber
+# Edit time:     298 min
 #
 """
 
@@ -107,6 +107,7 @@ class Operations(llfuse.Operations):
     def init(self):
         assert not self._initialized
         self._initialized = True
+        return self
 
     def destroy(self):
         assert self._initialized
@@ -219,6 +220,9 @@ class Operations(llfuse.Operations):
         leaf = rn.leaf_class(self.forest, name=new_name)
         self.forest.get_inode_by_node(rn).set_node(rn.add(leaf))
         inode.set_leaf_node(leaf)
+        # TBD: This clearly mutilates 'mode' (and other attributes)
+        # quite severely as they are essentially default values. Is it
+        # a problem?
 
     def listxattr(self, inode, ctx):
         assert self._initialized
@@ -342,9 +346,16 @@ class Operations(llfuse.Operations):
         parent_inode_new = self.forest.get_inode_by_value(parent_inode_new)
         n = self.forest.lookup(parent_inode_old, name_old)
         assert_or_errno(n, ENOENT)
+        old_data = n.direntry.data
+        assert 'st_ino' not in old_data  # should never be persisted
         try:
             self.unlink(parent_inode_old.value, name_old, ctx, allow_any=True)
             self.link(n.value, parent_inode_new.value, name_new, ctx)
+            n2 = self.forest.lookup(parent_inode_new, name_new)
+            assert n2
+            n2.direntry.data.update(old_data)
+            n2.deref()
+
         finally:
             n.deref()
 
