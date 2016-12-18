@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Fri Dec 16 09:07:07 2016 mstenber
-# Edit time:     44 min
+# Last modified: Sun Dec 18 20:13:45 2016 mstenber
+# Edit time:     47 min
 #
 """
 
@@ -236,12 +236,13 @@ class FileBlockTreeNode(LoadedTreeNode):
 
 class FileData(DirtyMixin):
     entry_type = const.TYPE_FILEDATA
+    block_data = None
 
     def __init__(self, forest, block_id, block_data):
         self.forest = forest
         self.block_id = block_id
-        self.block_data = block_data
-        if block_data:
+        if block_data is not None:
+            self.block_data = block_data
             self.mark_dirty()
 
     @property
@@ -250,10 +251,13 @@ class FileData(DirtyMixin):
             data = self.forest.storage.get_block_data_by_id(self.block_id)
             (t, d) = data
             assert t == self.entry_type
-            self.block_data = d
+            return d
+            # TBD: Do we really WANT to store data locally?
+            #self.block_data = d
         return self.block_data
 
     def perform_flush(self, *, in_inode=True):
+        assert self.block_data is not None
         bd = (self.entry_type, self.block_data)
         bid = sha256(*bd)
         if self.block_id == bid:
@@ -264,6 +268,7 @@ class FileData(DirtyMixin):
             self.forest.storage.release_block(bid)
             # we SHOULD be fine, as we are INode.node
             # -> block_id does not disappear even in refcnt 0 immediately.
+        del self.block_data
         return True
 
 
