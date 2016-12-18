@@ -6,6 +6,10 @@
 
 (Same utility mixin superclass / contained object?)
 
+** Think how to decrease size of node trees when they consume too much memory
+
+- if whole subtree is non-dirty, we could in theory just drop it..
+
 ** Check/test
 
 *** Truncation
@@ -26,7 +30,24 @@ within the tree order?)
 
 * Pending before it can be used for single-user, multiple-installations
 
-** Implement tree sync code (SHOULD be straightforward, but who knows)
+** Implement tree remote protocol
+
+essentially have to store locally from leaves onward; otherwise refcnts are
+wrong. however, how does partial tree work in this case? it does not,
+really.
+
+so the remoting will have two modes:
+
+- weak references ('cache') + remote access on demand
+
+- strong references + stored remote trees to be merged
+ - should store leaves first so we can correctly handle dependencies..
+
+** Implement tree merge code (SHOULD be straightforward, but who knows)
+
+- given 'last point in sync with X', compare current local tree + X's
+  current remote tree top.
+
 
 * Pending before it can be used (reliably) for multi-user
 
