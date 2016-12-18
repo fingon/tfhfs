@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:06:01 2016 mstenber
-# Last modified: Fri Dec 16 06:37:25 2016 mstenber
-# Edit time:     16 min
+# Last modified: Sun Dec 18 20:57:48 2016 mstenber
+# Edit time:     39 min
 #
 """
 
@@ -115,11 +115,12 @@ class DataMixin(DirtyMixin):
 
     @property
     def _cbor_data(self):
-        return self.cbor_data_pickler.get_external_dict_from_internal_dict(self.data)
+        return dict(self.cbor_data_pickler.get_external_items_from_internal_items(self.data.items()))
 
     @_cbor_data.setter
     def _cbor_data(self, value):
-        d = self.cbor_data_pickler.get_internal_dict_from_external_dict(value)
+        d = dict(
+            self.cbor_data_pickler.get_internal_items_from_external_items(value.items()))
         self._data = d
 
 
@@ -149,26 +150,43 @@ class CBORPickler:
     def dumps(self, o):
         return cbor.dumps(self.get_external_dict(o))
 
+    def get_internal_dict_items(self, o):
+        for k in self.internal2external_dict.keys():
+            v = getattr(o, k, None)
+            # If it is class default, no point dumping
+            # if not provided by class, we assume default to be None
+            if v == getattr(o.__class__, k, None):
+                continue
+            yield k, v
+
+    def get_external_items_from_internal_items(self, it):
+        for k, v in it:
+            yield self.internal2external_dict[k], v
+
     def get_external_dict(self, o):
-        return {self.internal2external_dict[k]: getattr(o, k)
-                for k in self.internal2external_dict.keys()}
+        return dict(self.get_external_items_from_internal_items(self.get_internal_dict_items(o)))
 
-    def get_external_dict_from_internal_dict(self, d):
-        return {self.internal2external_dict[k]: d.get(k)
-                for k in self.internal2external_dict.keys()}
-
-    def get_internal_dict_from_external_dict(self, d):
-        return {self.external2internal_dict[k]: d.get(k)
-                for k in self.external2internal_dict.keys()}
+    def get_internal_items_from_external_items(self, it):
+        for k, v in it:
+            yield self.external2internal_dict[k], v
 
     def load_external_dict_to(self, d, o):
         self.set_external_dict_to(cbor.loads(d), o)
         return o
 
     def set_external_dict_to(self, d, o):
-        for k, v in d.items():
-            k2 = self.external2internal_dict[k]
-            setattr(o, k2, v)
+        self.unload_from(o)
+        for k, v in self.get_internal_items_from_external_items(d.items()):
+            setattr(o, k, v)
+
+    def unload_from(self, o):
+        for k in self.external2internal_dict.values():
+            if hasattr(o, k):
+                try:
+                    delattr(o, k)
+                except AttributeError:
+                    # may be in class..
+                    pass
 
 
 def getrecsizeof(o, seen=None):

@@ -9,14 +9,44 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Dec 16 06:47:30 2016 mstenber
-# Last modified: Fri Dec 16 06:51:34 2016 mstenber
-# Edit time:     4 min
+# Last modified: Sun Dec 18 20:40:09 2016 mstenber
+# Edit time:     12 min
 #
 """
 
 """
 
 import util
+
+
+def test_cborpickler():
+    cbp = util.CBORPickler(dict(foo=42, bar=7))
+
+    class Dummy:
+        foo = 42
+
+    o = Dummy()
+    o.foo = 42
+    assert cbp.get_external_dict(o) == {}
+
+    o = Dummy()
+    o.foo = None
+    assert cbp.get_external_dict(o) == {42: None}
+
+    o = Dummy()
+    o.bar = None
+    assert cbp.get_external_dict(o) == {}
+
+    o = Dummy()
+    o.foo = 'foov'
+    assert cbp.get_external_dict(o) == {42: 'foov'}
+
+    o2 = Dummy()
+    cbp.load_external_dict_to(cbp.dumps(o), o2)
+    assert vars(o) == vars(o2)
+    cbp.unload_from(o2)
+    assert vars(o) != vars(o2)
+    assert vars(o2) == {}
 
 
 def test_getrecsizeof_dict():
