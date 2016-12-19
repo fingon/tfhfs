@@ -6,8 +6,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Nov 19 10:48:22 2016 mstenber
-# Last modified: Thu Dec 15 22:20:30 2016 mstenber
-# Edit time:     11 min
+# Last modified: Tue Dec 20 07:56:55 2016 mstenber
+# Edit time:     13 min
 #
 #
 
@@ -38,6 +38,9 @@ test: .done.requirements
 
 log.txt: .done.requirements $(wildcard *.py)
 	py.test -p no:sugar --strict -rx -rw -o xfail_strict=True -n $(CORE_COUNT) 2>&1 | tee log.txt
+
+profile: .done.requirements
+	python3 -m cProfile -o profile `which py.test`
 
 .done.requirements: requirements/*.txt
 	pip3 install --upgrade $(PIP_TO_USER) -c requirements/constraints.txt -r requirements/runtime.txt -r requirements/development.txt
