@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Mon Dec 19 06:33:16 2016 mstenber
-# Edit time:     401 min
+# Last modified: Mon Dec 19 15:25:53 2016 mstenber
+# Edit time:     407 min
 #
 """This is the 'storage layer' main module.
 
@@ -236,7 +236,7 @@ bytes, no clue if the block is already inserted (by someone else) ->
 either refer to existing one, or add new block to the storage
 layer."""
         r = self.get_block_by_id(block_id)
-        if r:
+        if r is not None:
             self.refer_block(block_id)
         else:
             self.store_block(block_id, block_data)
@@ -482,7 +482,9 @@ class DelayedStorageItem:
             setattr(self, k, v)
 
     def __repr__(self):
-        return '<%s: %s>' % (self.__class__.__name__, vars(self))
+        d = vars(self).copy()
+        del d['data_refcnt']
+        return '<%s: %s>' % (self.__class__.__name__, d)
 
 
 class DelayedStorage(Storage):
