@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Sun Dec 18 19:45:52 2016 mstenber
-# Edit time:     298 min
+# Last modified: Mon Dec 19 15:28:42 2016 mstenber
+# Edit time:     300 min
 #
 """
 
@@ -165,10 +165,10 @@ class Operations(llfuse.Operations):
             fd = file_inode.open(flags)
         except:
             file_inode.deref()
-            # Otherwise we can return it and increment the refcnt
             raise
+        # We can return it and increment the refcnt implicitly (done
+        # in lookup/create_file)
         return fd, self._inode_attributes(file_inode)
-        # return fd, self._leaf_attributes(file_inode.leaf_node)
 
     def flush(self, fh):
         assert self._initialized
@@ -379,7 +379,7 @@ class Operations(llfuse.Operations):
         inode = self.forest.get_inode_by_value(inode)
         de = inode.direntry
         assert_or_errno(self.access(inode.value, os.W_OK, ctx)
-                        or inode.direntry.uid == ctx.uid, EPERM)
+                        or inode.direntry.data.get('uid', 0) == ctx.uid, EPERM)
         if fields.update_uid:
             assert_or_errno(not ctx.uid, EPERM)
             de.set_data('st_uid', attr.st_uid)
