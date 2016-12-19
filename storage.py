@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Mon Dec 19 15:25:53 2016 mstenber
-# Edit time:     407 min
+# Last modified: Mon Dec 19 16:12:29 2016 mstenber
+# Edit time:     416 min
 #
 """This is the 'storage layer' main module.
 
@@ -36,6 +36,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 import const
 import lz4
+import util
 from endecode import Decoder, Encoder
 from util import getrecsizeof
 
@@ -513,7 +514,7 @@ class DelayedStorage(Storage):
         if block_id not in self._blocks:
             r = self.storage.get_block_by_id(block_id)
             if r:
-                self.cache_size += len(r[0])
+                self.cache_size += util.getrecsizeof(r[0])
                 orig_refcnt = r[1]
             else:
                 r = (None, 0)
@@ -538,7 +539,7 @@ class DelayedStorage(Storage):
             if positive is not None and ((block_refcnt < orig_refcnt) == (not positive)):
                 continue
             if block_data and not block_refcnt:
-                self.cache_size -= len(block_data)
+                self.cache_size -= util.getrecsizeof(block_data)
                 o.data_refcnt[0] = None
             if block_refcnt == orig_refcnt:
                 continue
@@ -557,7 +558,7 @@ class DelayedStorage(Storage):
         for o in self._blocks.values():
             (block_data, block_refcnt) = o.data_refcnt
             if block_data:
-                v += len(block_data)
+                v += util.getrecsizeof(block_data)
         return v
 
     @property
@@ -566,7 +567,7 @@ class DelayedStorage(Storage):
         for o in self._blocks.values():
             (block_data, block_refcnt) = o.data_refcnt
             if block_data and not o.orig_refcnt and block_refcnt:
-                v += len(block_data)
+                v += util.getrecsizeof(block_data)
         return v
 
     def _flush_names(self):
@@ -595,7 +596,7 @@ class DelayedStorage(Storage):
         assert o.data_refcnt[1] == orig_refcnt  # in cache -> should be
         block_data = o.data_refcnt[0]
         if block_data:
-            self.cache_size -= len(block_data)
+            self.cache_size -= util.getrecsizeof(block_data)
 
     def delete_block_id(self, block_id):
         pass
@@ -670,12 +671,15 @@ class DelayedStorage(Storage):
     def store_block(self, block_id, block_data, *, refcnt=1):
         _debug('store_block %s', block_id)
         r = self._get_block_by_id(block_id)
-        assert r.data_refcnt[0] is None
-        assert block_data
+        if r.data_refcnt[0] is not None:
+            assert not r.data_refcnt[1]
+            r.data_refcnt[1] = refcnt
+            return
         self.on_add_block_data(block_data)
         r.data_refcnt = [block_data, refcnt]
-        self.dirty_size += len(block_data)
-        self.cache_size += len(block_data)
+        s = util.getrecsizeof(block_data)
+        self.dirty_size += s
+        self.cache_size += s
         if (self.maximum_dirty_size and
                 self.dirty_size > self.maximum_dirty_size):
             self.flush()
