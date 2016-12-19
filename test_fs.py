@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Mon Dec 19 17:40:51 2016 mstenber
-# Edit time:     146 min
+# Last modified: Mon Dec 19 18:15:23 2016 mstenber
+# Edit time:     153 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -291,6 +291,8 @@ if __name__ == '__main__':
     p.add_argument(
         '--filename', '-f',
         help='Filename to store the data in')
+    p.add_argument('--interval', '-i',
+                   type=int, default=10, help='flush interval')
     p.add_argument('--mountpoint', '-m',
                    default='/tmp/x',
                    help='Where the file should be mounted')
@@ -298,6 +300,8 @@ if __name__ == '__main__':
     p.add_argument(
         '--password', '-p',
         help='Program to get the password from for encryption')
+    p.add_argument('--workers', '-w',
+                   default=1, type=int, help='number of threads to use')
     args = p.parse_args()
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
@@ -319,6 +323,7 @@ if __name__ == '__main__':
 
     else:
         storage = st.DictStorage()
+
     forest = forest.Forest(storage, llfuse.ROOT_INODE)
     ops = ops.Operations(forest)
     fuse_options = set(llfuse.default_options)
@@ -327,9 +332,19 @@ if __name__ == '__main__':
     if args.debug:
         fuse_options.add('debug')
     llfuse.init(ops, args.mountpoint, fuse_options)
+    tl = [None]
+    import threading
+
+    def _run_flush_timer():
+        with llfuse.lock:
+            ops.forest.flush()
+        tl[0] = threading.Timer(args.interval, _run_flush_timer)
+        tl[0].start()
+    _run_flush_timer()
     try:
-        llfuse.main(workers=1)
+        llfuse.main(workers=args.workers)
     except:
         llfuse.close(unmount=False)
         raise
     llfuse.close()
+    tl[0].cancel()
