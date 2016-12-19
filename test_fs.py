@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Mon Dec 19 06:44:19 2016 mstenber
-# Edit time:     135 min
+# Last modified: Mon Dec 19 15:05:10 2016 mstenber
+# Edit time:     136 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -284,7 +284,8 @@ if __name__ == '__main__':
                    help='Maximum cache size used by storage')
     p.add_argument('--dirty-size', type=int, default=1024**2,
                    help='Maximum dirty size used by storage')
-    p.add_argument('--debug', action='store_true', help='Enable debugging')
+    p.add_argument('--debug', '-d', action='store_true',
+                   help='Enable debugging')
     p.add_argument(
         '--filename', '-f',
         help='Filename to store the data in')
