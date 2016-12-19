@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Sun Dec 18 19:47:37 2016 mstenber
-# Edit time:     183 min
+# Last modified: Mon Dec 19 15:01:47 2016 mstenber
+# Edit time:     196 min
 #
 """
 
@@ -202,10 +202,32 @@ def test_symlink(oc):
     oc.ops.forget1(a.st_ino)
 
 
+def test_symlink_over_nonowned_err(oc):
+    target = b'/user_file'
+    try:
+        oc.ops.symlink(llfuse.ROOT_INODE, b'root_file', target, oc.rctx_user)
+        assert False
+    except llfuse.FUSEError as e:
+        assert e.errno == errno.EPERM
+
+
 def test_rename(oc):
     oc.ops.rename(llfuse.ROOT_INODE, b'user_dir',
                   llfuse.ROOT_INODE, b'x', oc.rctx_root)
     a = oc.ops.lookup(llfuse.ROOT_INODE, b'x', oc.rctx_root)
+    oc.ops.forget1(a.st_ino)
+    try:
+        oc.ops.lookup(llfuse.ROOT_INODE, b'user_dir', oc.rctx_root)
+        assert False
+    except llfuse.FUSEError:
+        pass
+
+
+def test_rename_overwrite(oc):
+    oc.ops.rename(llfuse.ROOT_INODE, b'user_dir',
+                  llfuse.ROOT_INODE, b'user_file', oc.rctx_root)
+    a = oc.ops.lookup(llfuse.ROOT_INODE, b'user_file', oc.rctx_root)
+    assert stat.S_ISDIR(a.st_mode)
     oc.ops.forget1(a.st_ino)
     try:
         oc.ops.lookup(llfuse.ROOT_INODE, b'user_dir', oc.rctx_root)
@@ -365,6 +387,10 @@ def test_mknod_c(oc):
     a = oc.ops.mknod(llfuse.ROOT_INODE, b'bdev',
                      stat.S_IFBLK, 43, oc.rctx_user)
     assert a.st_rdev == 43
+    oc.ops.forget1(a.st_ino)
+    a = oc.ops.mknod(llfuse.ROOT_INODE, b'regfile',
+                     stat.S_IFREG, 44, oc.rctx_user)
+    assert not a.st_rdev
     oc.ops.forget1(a.st_ino)
 
 
