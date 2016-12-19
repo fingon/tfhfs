@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Fri Dec 16 08:00:19 2016 mstenber
-# Edit time:     226 min
+# Last modified: Mon Dec 19 15:35:39 2016 mstenber
+# Edit time:     233 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -101,11 +101,17 @@ class FileDescriptor:
         self.inode.ref()
 
     def __del__(self):
-        self.close()
+        # MUST have been closed elsewhere!
+        # assert self.inode is None
+
+        # ^ This check is mostly spurious; normally objects are only
+        # disappearing from fdstore via .close(). Only if whole
+        # fdstore (=forest) terminates abruptly, they may disappear
+        # 'faster'.
+        pass
 
     def close(self):
-        if self.inode is None:
-            return
+        assert self.inode is not None
         self.inode.store.unregister_fd(self.fd)
         self.inode.deref()
         del self.inode
