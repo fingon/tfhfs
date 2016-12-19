@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Mon Dec 19 15:28:42 2016 mstenber
-# Edit time:     300 min
+# Last modified: Mon Dec 19 17:00:45 2016 mstenber
+# Edit time:     315 min
 #
 """
 
@@ -121,7 +121,7 @@ class Operations(llfuse.Operations):
 
     # Normal client API
 
-    def _de_access(self, de, mode, ctx):
+    def _de_access(self, de, mode, ctx, *, or_own=False):
         dedata = de.data
         target_mode = dedata.get('st_mode', 0)
         target_uid = dedata.get('st_uid', 0)
@@ -131,15 +131,16 @@ class Operations(llfuse.Operations):
             perms |= (target_mode >> 3) & 0x7
         if ctx.uid == target_uid:
             perms |= (target_mode >> 6) & 0x7
-        r = (perms & mode) == mode or not ctx.uid
+        r = ((perms & mode) == mode
+             or not ctx.uid or (ctx.uid == target_uid and or_own))
         _debug('uid:%d perms:%d, target:%d => %s', ctx.uid, perms, mode, r)
         return r
 
-    def access(self, inode, mode, ctx):
+    def access(self, inode, mode, ctx, **kw):
         assert self._initialized
         assert mode  # F_OK = 0, but should not show up(?)
         inode = self.forest.get_inode_by_value(inode)
-        return self._de_access(inode.direntry, mode, ctx)
+        return self._de_access(inode.direntry, mode, ctx, **kw)
 
     def _set_de_perms_from_ctx(self, de, ctx):
         de.set_data('st_uid', ctx.uid)
@@ -194,12 +195,12 @@ class Operations(llfuse.Operations):
 
     def getattr(self, inode, ctx):
         assert self._initialized
-        assert_or_errno(self.access(inode, os.R_OK, ctx), EPERM)
+        # assert_or_errno(self.access(inode, os.R_OK, ctx, or_own=True), EPERM)
         return self._inode_attributes(self.forest.get_inode_by_value(inode))
 
     def getxattr(self, inode, name, ctx):
         assert self._initialized
-        assert_or_errno(self.access(inode, os.R_OK, ctx), EPERM)
+        # assert_or_errno(self.access(inode, os.R_OK, ctx, or_own=True), EPERM)
         inode = self.forest.get_inode_by_value(inode)
         xa = inode.direntry.data.get('xattr')
         assert_or_errno(xa, ENOATTR)
@@ -226,7 +227,7 @@ class Operations(llfuse.Operations):
 
     def listxattr(self, inode, ctx):
         assert self._initialized
-        assert_or_errno(self.access(inode, os.R_OK, ctx), EPERM)
+        # assert_or_errno(self.access(inode, os.R_OK, ctx), EPERM)
         inode = self.forest.get_inode_by_value(inode)
         return inode.direntry.data.get('xattr', {}).keys()
 
@@ -330,7 +331,7 @@ class Operations(llfuse.Operations):
         self.forest.get_inode_by_value(fh).deref()
 
     def removexattr(self, inode, name, ctx):
-        assert_or_errno(self.access(inode, os.W_OK, ctx), EPERM)
+        assert_or_errno(self.access(inode, os.W_OK, ctx, or_own=True), EPERM)
         inode = self.forest.get_inode_by_value(inode)
         xa = inode.direntry.data.get('xattr', {})
         assert_or_errno(name in xa, ENOATTR)
@@ -378,8 +379,8 @@ class Operations(llfuse.Operations):
         assert self._initialized
         inode = self.forest.get_inode_by_value(inode)
         de = inode.direntry
-        assert_or_errno(self.access(inode.value, os.W_OK, ctx)
-                        or inode.direntry.data.get('uid', 0) == ctx.uid, EPERM)
+        assert_or_errno(self.access(inode.value, os.W_OK, ctx, or_own=True),
+                        EPERM)
         if fields.update_uid:
             assert_or_errno(not ctx.uid, EPERM)
             de.set_data('st_uid', attr.st_uid)
@@ -397,7 +398,7 @@ class Operations(llfuse.Operations):
 
     def setxattr(self, inode, name, value, ctx):
         assert self._initialized
-        assert_or_errno(self.access(inode, os.W_OK, ctx), EPERM)
+        assert_or_errno(self.access(inode, os.W_OK, ctx, or_own=True), EPERM)
         inode = self.forest.get_inode_by_value(inode)
         xa = inode.direntry.data.get('xattr', {})
         xa[name] = value
@@ -460,7 +461,8 @@ class Operations(llfuse.Operations):
         n = self.forest.lookup(pn, name)
         assert_or_errno(n, ENOENT)
         try:
-            assert_or_errno(self._de_access(n.direntry, os.W_OK, ctx), EPERM)
+            assert_or_errno(self._de_access(
+                n.direntry, os.W_OK, ctx, or_own=True), EPERM)
             assert_or_errno(n.leaf_node.is_file or allow_any, ENOENT)
             pn.node.remove(n.leaf_node)
             n.set_leaf_node(None)
