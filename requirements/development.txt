@@ -3,3 +3,4 @@ pytest-catchlog
 pytest-sugar
 pytest-xdist
 pytest-timeout
+pytest-ordering

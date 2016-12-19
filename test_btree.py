@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 16:29:53 2016 mstenber
-# Last modified: Thu Dec 15 05:05:49 2016 mstenber
-# Edit time:     42 min
+# Last modified: Tue Dec 20 07:50:33 2016 mstenber
+# Edit time:     46 min
 #
 """
 
@@ -66,6 +66,7 @@ class LeafierTreeNode(btree.TreeNode):
     has_spares_size = maximum_size / 2
 
 
+@pytest.mark.run(order=-1)  # quite slow :p
 @pytest.mark.parametrize('hashleaf', [False, True])
 def test_large_tree(hashleaf):
     root = LeafierTreeNode()
