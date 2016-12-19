@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Dec 16 06:47:30 2016 mstenber
-# Last modified: Sun Dec 18 20:40:09 2016 mstenber
-# Edit time:     12 min
+# Last modified: Mon Dec 19 16:18:53 2016 mstenber
+# Edit time:     15 min
 #
 """
 
@@ -67,6 +67,15 @@ def test_getrecsizeof_list():
     s1 = util.getrecsizeof([])
     s2 = util.getrecsizeof([42])
     s3 = util.getrecsizeof([42, 43])
+    assert s1 > 0
+    assert s1 < s2
+    assert s2 < s3
+
+
+def test_getrecsizeof_tuple():
+    s1 = util.getrecsizeof(tuple([]))
+    s2 = util.getrecsizeof(tuple([42]))
+    s3 = util.getrecsizeof(tuple([42, 43]))
     assert s1 > 0
     assert s1 < s2
     assert s2 < s3

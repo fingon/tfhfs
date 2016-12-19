@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:06:01 2016 mstenber
-# Last modified: Sun Dec 18 20:57:48 2016 mstenber
-# Edit time:     39 min
+# Last modified: Mon Dec 19 16:24:05 2016 mstenber
+# Edit time:     45 min
 #
 """
 
@@ -18,6 +18,7 @@ Random utility things.
 
 """
 
+import collections
 import hashlib
 import logging
 import sys
@@ -200,7 +201,9 @@ def getrecsizeof(o, seen=None):
         for k, v in o.items():
             c += getrecsizeof(k, seen)
             c += getrecsizeof(v, seen)
-    elif isinstance(o, list):
+    elif isinstance(o, str) or isinstance(o, bytes):
+        pass
+    elif isinstance(o, collections.Iterable):
         for e in o:
             c += getrecsizeof(e, seen)
     return c
