@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Sun Dec 18 20:01:38 2016 mstenber
-# Edit time:     137 min
+# Last modified: Mon Dec 19 18:40:12 2016 mstenber
+# Edit time:     150 min
 #
 """
 
@@ -100,10 +100,13 @@ def _prod_storage(s, flush=_nop):
     assert s.get_block_data_by_id(b'bar') == None
 
     # Assume it did not have dependency handling before; add it now:
-    deps = {b'content1': [b'id2']}
+    deps = {b'content1': [b'id2'],
+            b'contentk': [b'idk2']}
 
-    def _depfun(block_id):
-        return deps.get(block_id, [])
+    def _depfun(block_data):
+        d = deps.get(block_data, [])
+        _debug('_depfun %s = %s', d)
+        return d
     _debug('## add id2 + id1 with dep on id2')
     s.set_block_data_references_callback(_depfun)
     s.store_block(b'id2', b'content2')
@@ -124,18 +127,25 @@ def _prod_storage(s, flush=_nop):
     assert not s.get_block_by_id(b'id1')
     assert not s.get_block_by_id(b'id2')
 
-    # Add fictional block which has external references
+    # Add fictional block which has external references and depends on another
+    # one
     if flush is not _nop:
+        s.store_block(b'idk2', b'contentk2')
         s.store_block(b'idk', b'contentk')
         _flush_twice(s, flush)
+        assert s.get_block_by_id(b'idk2')[1] == 2
+        assert s.get_block_by_id(b'idk')[1] == 1
+        s.release_block(b'idk2')
         s.release_block(b'idk')
         _flush_twice(s, flush)
+        assert s.get_block_by_id(b'idk2')[1] == 1
         assert s.get_block_by_id(b'idk')[1] == 0
 
         # Back to class default
         s.set_block_id_has_references_callback(None)
         _flush_twice(s, flush)
         assert not s.get_block_by_id(b'idk')
+        assert not s.get_block_by_id(b'idk2')
 
     _debug('_prod_storage done')
 
