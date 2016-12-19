@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Mon Dec 19 16:12:29 2016 mstenber
-# Edit time:     416 min
+# Last modified: Mon Dec 19 16:28:25 2016 mstenber
+# Edit time:     418 min
 #
 """This is the 'storage layer' main module.
 
@@ -529,7 +529,7 @@ class DelayedStorage(Storage):
 
     def _flush_blocks(self, positive):
         ops = 0
-        for block_id, o in sorted(self._blocks.items()):
+        for block_id, o in list(self._blocks.items()):
             (block_data, block_refcnt) = o.data_refcnt
             orig_refcnt = o.orig_refcnt or 0
 
