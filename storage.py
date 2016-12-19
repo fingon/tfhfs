@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Mon Dec 19 18:25:31 2016 mstenber
-# Edit time:     431 min
+# Last modified: Mon Dec 19 19:55:20 2016 mstenber
+# Edit time:     496 min
 #
 """This is the 'storage layer' main module.
 
@@ -177,15 +177,38 @@ _nopiterator = _NopIterator()
 
 class Storage:
 
+    referenced_refcnt0_block_ids = None
+
     def block_data_references_callback(self, block_data):
         return _nopiterator
 
+    def block_id_has_references_callback(self, block_id):
+        pass
+
+    def delete_block_id_if_no_extref(self, block_id):
+        """This is the main delete function and should be called if the class
+        cares about external dependencies. If external dependencies
+        exist, this function will be eventually called by later flush
+        methods until they do not exist.
+        """
+        _debug('delete_block_id_if_no_extref %s', block_id)
+        if self.block_id_has_references_callback(block_id):
+            if not self.referenced_refcnt0_block_ids:
+                self.referenced_refcnt0_block_ids = set()
+            self.referenced_refcnt0_block_ids.add(block_id)
+            _debug(' .. externally referred, omitting for now')
+            return
+        if self.referenced_refcnt0_block_ids:
+            self.referenced_refcnt0_block_ids.discard(block_id)
+        return self.delete_block_id_with_deps(block_id)
+
     def delete_block_id_with_deps(self, block_id):
         """Delete block id and remove its references."""
-        r = self.get_block_by_id(block_id)
+        _debug('delete_block_id_with_deps %s', block_id)
+        r = self.get_block_by_id(block_id, cleanup=True)
         assert r
         (block_data, block_refcnt) = r
-        assert block_data
+        assert block_data is not None
         for block_id2 in self.get_block_data_references(block_data):
             if block_id2:
                 self.release_block(block_id2)
@@ -196,10 +219,26 @@ class Storage:
         """Raw deletion on storage. This is up to particular Storage subclasses. """
         raise NotImplementedError
 
+    def flush(self):
+        """ Attempt to get rid of dangling reference count 0 blocks. """
+        while self.referenced_refcnt0_block_ids:
+            s = self.referenced_refcnt0_block_ids
+            del self.referenced_refcnt0_block_ids
+            deleted = False
+            for block_id in s:
+                _debug('flush dangling %s', block_id)
+                (data, refcnt) = self.get_block_by_id(block_id, cleanup=True)
+                assert data
+                if not refcnt:
+                    if self.delete_block_id_if_no_extref(block_id):
+                        deleted = True
+            if not deleted:
+                return
+
     def get_block_data_references(self, block_data):
         yield from self.block_data_references_callback(block_data)
 
-    def get_block_by_id(self, block_id):
+    def get_block_by_id(self, block_id, *, cleanup=False):
         """Get data for the block identified by block_id. If the block does
 not exist, None is returned. If it exists, (block data, reference count) tuple is returned."""
         raise NotImplementedError
@@ -236,6 +275,8 @@ set, None is returned."""
 bytes, no clue if the block is already inserted (by someone else) ->
 either refer to existing one, or add new block to the storage
 layer."""
+        if self.referenced_refcnt0_block_ids:
+            self.referenced_refcnt0_block_ids.discard(block_id)
         r = self.get_block_by_id(block_id)
         if r is not None:
             self.refer_block(block_id)
@@ -247,11 +288,16 @@ layer."""
         assert r
         refcnt = r[1] - 1
         assert refcnt >= 0
-        self.set_block_refcnt(block_id, refcnt)
+        self.set_block_refcnt_or_delete(block_id, refcnt)
         return refcnt > 0
 
     def set_block_data_references_callback(self, callback):
         self.block_data_references_callback = callback
+
+    def set_block_id_has_references_callback(self, callback):
+        self.block_id_has_references_callback = callback
+        if callback is None:
+            del self.block_id_has_references_callback
 
     def set_block_name(self, block_id, n):
         old_block_id = self.get_block_id_by_name(n)
@@ -272,11 +318,24 @@ layer."""
         raise NotImplementedError
 
     def set_block_refcnt(self, block_id, refcnt):
-        """ Set reference count of the 'block_id' to 'refcnt'.
+        """Set reference count of the 'block_id' to 'refcnt'.
 
-        If refcnt is zero, the block should be removed.
-        """
+        This call MUST NOT trigger deletion on its own."""
         raise NotImplementedError
+
+    def set_block_refcnt_or_delete(self, block_id, refcnt, *, nodelete=False):
+        """Set reference count of the 'block_id' to 'refcnt' and possibly delete it.
+
+        Blocks with zero reference count mean they do not have ON DISK
+        references. They MUST NOT be deleted immediately, but only if
+        external references disappear
+        (e.g. delete_block_id_if_no_extref is safe to call).
+
+        If nodelete is set, 0 should be simply stored.
+        """
+        self.set_block_refcnt(block_id, refcnt)
+        if not nodelete and not refcnt:
+            self.delete_block_id_if_no_extref(block_id)
 
     def store_block(self, block_id, block_data, *, refcnt=1):
         """Store a block with the given block identifier. Note that it is an
@@ -285,68 +344,18 @@ set_block_refcnt should be called instead in that case."""
         raise NotImplementedError
 
 
-class ReferringStorage(Storage):
-    """Storage subclass with external references. Typically, only the
-    low-level storage (=one which uses disk directly) should bother with them.
-
-    e.g. caching storage layer should be able to ignore this part of
-    Storage logic.
-    """
-    referenced_refcnt0_block_ids = None
-
-    def __init__(self, block_id_has_references_callback=None, **kw):
-        self.set_block_id_has_references_callback(
-            block_id_has_references_callback)
-        Storage.__init__(self, **kw)
-
-    def block_id_has_references_callback(self, block_id):
-        pass
-
-    def delete_block_id_if_no_extref(self, block_id):
-        """This is the main delete function and should be called if the class
-        cares about external dependencies. If external dependencies
-        exist, this function will be eventually called by later flush
-        methods until they do not exist.
-        """
-        if self.block_id_has_references_callback(block_id):
-            if not self.referenced_refcnt0_block_ids:
-                self.referenced_refcnt0_block_ids = set()
-            self.referenced_refcnt0_block_ids.add(block_id)
-            return
-        return self.delete_block_id_with_deps(block_id)
-
-    def flush(self):
-        """ Attempt to get rid of dangling reference count 0 blocks. """
-        while self.referenced_refcnt0_block_ids:
-            s = self.referenced_refcnt0_block_ids
-            del self.referenced_refcnt0_block_ids
-            deleted = False
-            for block_id in s:
-                (data, refcnt) = self.get_block_by_id(block_id)
-                if not refcnt:
-                    if self.delete_block_id_if_no_extref(block_id):
-                        deleted = True
-            if not deleted:
-                return
-
-    def set_block_id_has_references_callback(self, callback):
-        self.block_id_has_references_callback = callback
-        if callback is None:
-            del self.block_id_has_references_callback
-
-
-class DictStorage(ReferringStorage):
+class DictStorage(Storage):
     """ For testing purposes, in-memory dict-based storage. """
 
-    def __init__(self, **kw):
-        ReferringStorage.__init__(self, **kw)
+    def __init__(self):
         self.name2bid = {}
         self.bid2datarefcnt = {}
 
     def delete_block_id(self, block_id):
+        _debug('delete_block_id %s', block_id)
         del self.bid2datarefcnt[block_id]
 
-    def get_block_by_id(self, block_id):
+    def get_block_by_id(self, block_id, *, cleanup=False):
         return self.bid2datarefcnt.get(block_id)
 
     def get_block_id_by_name(self, n):
@@ -368,15 +377,14 @@ class DictStorage(ReferringStorage):
 
     def set_block_refcnt(self, block_id, refcnt):
         self.bid2datarefcnt[block_id][1] = refcnt
-        if refcnt:
-            return
-        self.delete_block_id_if_no_extref(block_id)
 
     def store_block(self, block_id, block_data, *, refcnt=1):
+        assert block_id not in self.bid2datarefcnt
+        self.on_add_block_data(block_data)
         self.bid2datarefcnt[block_id] = [block_data, refcnt]
 
 
-class SQLiteStorage(ReferringStorage):
+class SQLiteStorage(Storage):
     """For testing purposes, SQLite backend. It does not probably perform
 THAT well but can be used to ensure things work correctly and as an
 added bonus has in-memory mode.
@@ -394,7 +402,6 @@ mix the two hobby projects for now..
             'CREATE TABLE blocks(id PRIMARY KEY, data, refcnt);')
         self._get_execute_result(
             'CREATE TABLE blocknames (name PRIMARY KEY, id);')
-        ReferringStorage.__init__(self, **kw)
 
     def _get_execute_result(self, q, a=None, ignore_errors=False):
         _debug('_get_execute_result %s %s', q, a)
@@ -414,10 +421,11 @@ mix the two hobby projects for now..
         return r
 
     def delete_block_id(self, block_id):
+        _debug('delete_block_id %s', block_id)
         self._get_execute_result(
-            'DELETE FROM blocks WHERE id=? and refcnt=0', (block_id,))
+            'DELETE FROM blocks WHERE id=?', (block_id,))
 
-    def get_block_by_id(self, block_id):
+    def get_block_by_id(self, block_id, *, cleanup=False):
         _debug('get_block_by_id %s', block_id)
         r = self._get_execute_result(
             'SELECT data,refcnt FROM blocks WHERE id=?', (block_id,))
@@ -461,9 +469,6 @@ mix the two hobby projects for now..
         # would multithread this backend anyway?
         self._get_execute_result(
             'UPDATE blocks SET refcnt=? WHERE id=?', (refcnt, block_id,))
-        if refcnt:
-            return
-        self.delete_block_id_if_no_extref(block_id)
 
     def store_block(self, block_id, block_data, *, refcnt=1):
         _debug('store_block %s %s', block_id, block_data)
@@ -494,8 +499,6 @@ class DelayedStorage(Storage):
 'writes' for later flush operation."""
 
     def __init__(self, storage, **kw):
-        Storage.__init__(self, **kw)
-        assert isinstance(storage, ReferringStorage)
         self.storage = storage
         self._names = {}  # name -> current, orig
 
@@ -538,9 +541,6 @@ class DelayedStorage(Storage):
             # (Why? Left as an exercise to the reader)
             if positive is not None and ((block_refcnt < orig_refcnt) == (not positive)):
                 continue
-            if block_data and not block_refcnt:
-                self.cache_size -= util.getrecsizeof(block_data)
-                o.data_refcnt[0] = None
             if block_refcnt == orig_refcnt:
                 continue
             if not orig_refcnt and block_refcnt:
@@ -548,6 +548,8 @@ class DelayedStorage(Storage):
                                          refcnt=block_refcnt)
             else:
                 self.storage.set_block_refcnt(block_id, block_refcnt)
+                if not block_refcnt:
+                    self.delete_block_id_if_no_extref(block_id)
             ops += 1
             o.orig_refcnt = block_refcnt
         return ops
@@ -599,10 +601,17 @@ class DelayedStorage(Storage):
             self.cache_size -= util.getrecsizeof(block_data)
 
     def delete_block_id(self, block_id):
-        pass
+        o = self._blocks[block_id]
+        if o.data_refcnt[0]:
+            self.cache_size -= util.getrecsizeof(o.data_refcnt[0])
+        if o.orig_refcnt:
+            self.storage.set_block_refcnt(block_id, 0)
+            self.storage.delete_block_id(block_id)
+        del self._blocks[block_id]
 
     def flush(self):
         _debug('flush')
+        Storage.flush(self)  # do repeat delete attempts first
         ops = 0
         ops += self._flush_blocks(1)
         self.dirty_size = 0  # new blocks if any are written to disk by now
@@ -613,21 +622,20 @@ class DelayedStorage(Storage):
         _debug(' => %d ops', ops)
         # Also call underlying storage's flush method in case some of this was
         # delayed
-        if hasattr(self.storage, 'flush'):
-            self.storage.flush()
-            # If it did, any local references with 0 refcnt may be gone.
-            # Remove them just in case.
-            for block_id, o in list(self._blocks.items()):
-                if not o.data_refcnt[1]:
-                    self._delete_cached_block_id(block_id)
+        self.storage.flush()
+        # If it did, any local references with 0 refcnt may be gone.
+        # Remove them just in case.
+        for block_id, o in list(self._blocks.items()):
+            if not o.data_refcnt[1] and not self.block_id_has_references_callback(block_id):
+                self._delete_cached_block_id(block_id)
         return ops
 
-    def get_block_by_id(self, block_id):
+    def get_block_by_id(self, block_id, *, cleanup=False):
         _debug('%s.get_block_by_id %s', self.__class__.__name__, block_id)
         r = self._get_block_by_id(block_id)
         _debug(' => %s', r)
-        if not r.data_refcnt[1] and not self.storage.block_id_has_references_callback(block_id):
-            _debug(' [skip]')
+        if not r.data_refcnt[1] and not self.block_id_has_references_callback(block_id) and not cleanup:
+            _debug(' [skip - no refcnt, not referred]')
             return
         return r.data_refcnt
 
@@ -646,9 +654,6 @@ class DelayedStorage(Storage):
     def get_bytes_used(self):
         return self.storage.get_bytes_used()
 
-    def set_block_id_has_references_callback(self, callback):
-        self.storage.set_block_id_has_references_callback(callback)
-
     def set_block_name_raw(self, block_id, n):
         self._get_block_id_by_name(n)[0] = block_id
 
@@ -657,13 +662,6 @@ class DelayedStorage(Storage):
                self.__class__.__name__, block_id, refcnt)
         r = self._get_block_by_id(block_id)
         assert r
-        if not refcnt:
-            self.delete_block_id_with_deps(block_id)
-            # We do not intentionally call delete_block_id, as
-            # underlying storage should have the information it needs
-            # and maintaining two implementations which check external
-            # references is inefficient and it is the underlying
-            # storage which counts.
 
         r.data_refcnt[1] = refcnt
         _debug(' => %s [set_block_refcnt]', r)
@@ -671,6 +669,7 @@ class DelayedStorage(Storage):
     def store_block(self, block_id, block_data, *, refcnt=1):
         _debug('store_block %s', block_id)
         assert isinstance(block_id, bytes)
+        assert block_data
         r = self._get_block_by_id(block_id)
         if r.data_refcnt[0] is not None:
             _debug(' .. just setting refcnt to %d', refcnt)

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Mon Dec 19 18:40:12 2016 mstenber
-# Edit time:     150 min
+# Last modified: Mon Dec 19 19:55:45 2016 mstenber
+# Edit time:     159 min
 #
 """
 
@@ -105,7 +105,7 @@ def _prod_storage(s, flush=_nop):
 
     def _depfun(block_data):
         d = deps.get(block_data, [])
-        _debug('_depfun %s = %s', d)
+        _debug('_depfun %s = %s', block_data, d)
         return d
     _debug('## add id2 + id1 with dep on id2')
     s.set_block_data_references_callback(_depfun)
@@ -130,6 +130,7 @@ def _prod_storage(s, flush=_nop):
     # Add fictional block which has external references and depends on another
     # one
     if flush is not _nop:
+        _debug('## idk+idk2, referred from inode')
         s.store_block(b'idk2', b'contentk2')
         s.store_block(b'idk', b'contentk')
         _flush_twice(s, flush)
@@ -137,13 +138,16 @@ def _prod_storage(s, flush=_nop):
         assert s.get_block_by_id(b'idk')[1] == 1
         s.release_block(b'idk2')
         s.release_block(b'idk')
+        _debug('# released; should still have post-flush')
         _flush_twice(s, flush)
         assert s.get_block_by_id(b'idk2')[1] == 1
         assert s.get_block_by_id(b'idk')[1] == 0
-
+        assert s.referenced_refcnt0_block_ids
         # Back to class default
+        _debug('# no longer referred by inode')
         s.set_block_id_has_references_callback(None)
         _flush_twice(s, flush)
+        assert not s.referenced_refcnt0_block_ids
         assert not s.get_block_by_id(b'idk')
         assert not s.get_block_by_id(b'idk2')
 
@@ -246,9 +250,8 @@ def test_compression_fail():
     assert c.decode_block(None, s) == (7, plaintext)
 
 
-def test_sqlitestorage():
-    s = SQLiteStorage()
-    _prod_storage(s)
+def test_storage(backend):
+    _prod_storage(backend)
 
 
 @pytest.mark.parametrize('kwargs', [
