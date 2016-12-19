@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Mon Dec 19 19:55:20 2016 mstenber
-# Edit time:     496 min
+# Last modified: Mon Dec 19 21:55:44 2016 mstenber
+# Edit time:     499 min
 #
 """This is the 'storage layer' main module.
 
@@ -397,11 +397,11 @@ mix the two hobby projects for now..
     def __init__(self, *, codec=None, filename=':memory:', **kw):
         self.filename = filename
         self.codec = codec or NopBlockCodec()
-        self.conn = sqlite3.connect(filename)
+        self.conn = sqlite3.connect(filename, check_same_thread=False)
         self._get_execute_result(
-            'CREATE TABLE blocks(id PRIMARY KEY, data, refcnt);')
+            'CREATE TABLE IF NOT EXISTS blocks(id PRIMARY KEY, data, refcnt);')
         self._get_execute_result(
-            'CREATE TABLE blocknames (name PRIMARY KEY, id);')
+            'CREATE TABLE IF NOT EXISTS blocknames (name PRIMARY KEY, id);')
 
     def _get_execute_result(self, q, a=None, ignore_errors=False):
         _debug('_get_execute_result %s %s', q, a)
