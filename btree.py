@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 15:36:58 2016 mstenber
-# Last modified: Wed Dec 14 08:52:45 2016 mstenber
-# Edit time:     294 min
+# Last modified: Mon Dec 19 16:48:19 2016 mstenber
+# Edit time:     300 min
 #
 """This is the 'btree' module.
 
@@ -302,7 +302,7 @@ should be propagated upwards in the tree)."""
             idx = bisect.bisect_right(n.child_keys, k)
             if idx:
                 idx -= 1
-            _debug(' idx %d', idx)
+            _debug(' idx %d for %s', idx, k)
             n = n.children[idx]
             _debug(' = %s', n)
             if not isinstance(n, TreeNode):

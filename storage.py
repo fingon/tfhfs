@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Mon Dec 19 16:28:25 2016 mstenber
-# Edit time:     418 min
+# Last modified: Mon Dec 19 18:25:31 2016 mstenber
+# Edit time:     431 min
 #
 """This is the 'storage layer' main module.
 
@@ -670,8 +670,10 @@ class DelayedStorage(Storage):
 
     def store_block(self, block_id, block_data, *, refcnt=1):
         _debug('store_block %s', block_id)
+        assert isinstance(block_id, bytes)
         r = self._get_block_by_id(block_id)
         if r.data_refcnt[0] is not None:
+            _debug(' .. just setting refcnt to %d', refcnt)
             assert not r.data_refcnt[1]
             r.data_refcnt[1] = refcnt
             return
@@ -680,6 +682,8 @@ class DelayedStorage(Storage):
         s = util.getrecsizeof(block_data)
         self.dirty_size += s
         self.cache_size += s
+        _debug(' +%d = %d dirty, %d cached',
+               s, self.dirty_size, self.cache_size)
         if (self.maximum_dirty_size and
                 self.dirty_size > self.maximum_dirty_size):
             self.flush()

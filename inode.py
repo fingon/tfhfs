@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Sun Dec 18 22:02:13 2016 mstenber
-# Edit time:     50 min
+# Last modified: Mon Dec 19 17:31:00 2016 mstenber
+# Edit time:     54 min
 #
 """
 
@@ -61,7 +61,7 @@ class INodeStore:
         return inode
 
     def count(self):
-        return len(self._node2inode)
+        return len(self._value2inode)
 
     def get_inode_by_node(self, node):
         assert isinstance(node, TreeNode)
@@ -109,6 +109,8 @@ class INodeStore:
 
     def remove_old_inodes(self):
         cnt = 0
+        _debug('remove_old_inodes - total:%d, pending:%d',
+               self.count(), len(self.inodes_waiting_to_remove))
         while self.inodes_waiting_to_remove:
             self.inodes_waiting_to_remove, tmp = \
                 set(), self.inodes_waiting_to_remove

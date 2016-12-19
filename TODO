@@ -2,6 +2,10 @@
 
 * Pending (before it can be used for ANYTHING)
 
+** Fix multi-worker model (sqlite not happy about distinct threads, sigh)
+
+** Better perf benchmarks.. :p
+
 ** Refactor the inode allocation to work like fd allocation - reusing numbers
 
 (Same utility mixin superclass / contained object?)
