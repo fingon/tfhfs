@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Mon Dec 19 15:05:10 2016 mstenber
-# Edit time:     136 min
+# Last modified: Mon Dec 19 17:40:51 2016 mstenber
+# Edit time:     146 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -282,6 +282,8 @@ if __name__ == '__main__':
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     p.add_argument('--cache-size', type=int, default=1024**3,
                    help='Maximum cache size used by storage')
+    p.add_argument('--compress', '-c', action='store_true',
+                   help='Compress the content opportunistically')
     p.add_argument('--dirty-size', type=int, default=1024**2,
                    help='Maximum dirty size used by storage')
     p.add_argument('--debug', '-d', action='store_true',
@@ -306,7 +308,10 @@ if __name__ == '__main__':
             codec = st.ConfidentialBlockCodec(password, salt)
         else:
             codec = st.NopBlockCodec()
-        codec = st.TypedBlockCodec(codec)
+        if args.compress:
+            codec = st.CompressingTypedBlockCodec(codec)
+        else:
+            codec = st.TypedBlockCodec(codec)
         storage = st.DelayedStorage(st.SQLiteStorage(codec=codec,
                                                      filename=args.filename))
         storage.maximum_cache_size = args.cache_size
