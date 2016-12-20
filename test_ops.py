@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Mon Dec 19 15:01:47 2016 mstenber
-# Edit time:     196 min
+# Last modified: Tue Dec 20 15:23:11 2016 mstenber
+# Edit time:     201 min
 #
 """
 
@@ -204,11 +204,10 @@ def test_symlink(oc):
 
 def test_symlink_over_nonowned_err(oc):
     target = b'/user_file'
-    try:
+    with pytest.raises(llfuse.FUSEError) as e:
         oc.ops.symlink(llfuse.ROOT_INODE, b'root_file', target, oc.rctx_user)
         assert False
-    except llfuse.FUSEError as e:
-        assert e.errno == errno.EPERM
+    assert e.value.errno == errno.EPERM
 
 
 def test_rename(oc):
@@ -216,11 +215,8 @@ def test_rename(oc):
                   llfuse.ROOT_INODE, b'x', oc.rctx_root)
     a = oc.ops.lookup(llfuse.ROOT_INODE, b'x', oc.rctx_root)
     oc.ops.forget1(a.st_ino)
-    try:
+    with pytest.raises(llfuse.FUSEError):
         oc.ops.lookup(llfuse.ROOT_INODE, b'user_dir', oc.rctx_root)
-        assert False
-    except llfuse.FUSEError:
-        pass
 
 
 def test_rename_overwrite(oc):
@@ -229,11 +225,8 @@ def test_rename_overwrite(oc):
     a = oc.ops.lookup(llfuse.ROOT_INODE, b'user_file', oc.rctx_root)
     assert stat.S_ISDIR(a.st_mode)
     oc.ops.forget1(a.st_ino)
-    try:
+    with pytest.raises(llfuse.FUSEError):
         oc.ops.lookup(llfuse.ROOT_INODE, b'user_dir', oc.rctx_root)
-        assert False
-    except llfuse.FUSEError:
-        pass
 
 
 def test_lookup(oc):
@@ -295,11 +288,9 @@ def testrmdir_fail_perm(oc):
 
 
 def testrmdir_fail_notempty(oc):
-    try:
+    with pytest.raises(llfuse.FUSEError) as e:
         oc.ops.rmdir(llfuse.ROOT_INODE, b'root_dir', oc.rctx_root)
-        assert False
-    except llfuse.FUSEError as e:
-        assert e.errno == errno.ENOTEMPTY
+    assert e.value.errno == errno.ENOTEMPTY
 
 
 def testrmdir_ok(oc):
@@ -365,11 +356,9 @@ def test_getattr(oc, inode, user_ctx):
 
 
 def test_basic_xattr(oc):
-    try:
+    with pytest.raises(llfuse.FUSEError) as e:
         oc.ops.getxattr(llfuse.ROOT_INODE, b'foo', oc.rctx_root)
-        assert False
-    except llfuse.FUSEError as e:
-        assert e.errno == errno.ENOATTR
+    assert e.value.errno == errno.ENOATTR
     assert list(oc.ops.listxattr(llfuse.ROOT_INODE, oc.rctx_root)) == []
     oc.ops.setxattr(llfuse.ROOT_INODE, b'foo', b'bar', oc.rctx_root)
     assert list(oc.ops.listxattr(llfuse.ROOT_INODE, oc.rctx_root)) == [b'foo']
