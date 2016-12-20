@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 15:36:58 2016 mstenber
-# Last modified: Mon Dec 19 16:48:19 2016 mstenber
-# Edit time:     300 min
+# Last modified: Tue Dec 20 09:43:17 2016 mstenber
+# Edit time:     306 min
 #
 """This is the 'btree' module.
 
@@ -31,6 +31,7 @@ HASH_SIZE = 32  # bytes
 NAME_HASH_SIZE = 4  # bytes
 # NAME_HASH_SIZE = 0  # none (for debugging use only)
 NAME_SIZE = 256  # maximum length of single name
+DEBUG = False  # Special flag which absolutely turns off logging here
 
 
 class Node:
@@ -291,20 +292,25 @@ should be propagated upwards in the tree)."""
         # this is root so  no need to worry about .key handling..
 
     def search_prev_or_eq(self, c):
-        _debug('search_prev_or_eq %s in %s', c, self)
+        if DEBUG:
+            _debug('search_prev_or_eq %s in %s', c, self)
         n = self
         k = c.key
         while True:
             if not n.child_keys:
-                _debug(' no children')
+                if DEBUG:
+                    _debug(' no children')
                 return
-            _debug(' child_keys %s', n.child_keys)
+            if DEBUG:
+                _debug(' child_keys %s', n.child_keys)
             idx = bisect.bisect_right(n.child_keys, k)
             if idx:
                 idx -= 1
-            _debug(' idx %d for %s', idx, k)
+            if DEBUG:
+                _debug(' idx %d for %s', idx, k)
             n = n.children[idx]
-            _debug(' = %s', n)
+            if DEBUG:
+                _debug(' = %s', n)
             if not isinstance(n, TreeNode):
                 return n
 
