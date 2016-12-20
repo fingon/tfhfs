@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Tue Dec 20 15:26:20 2016 mstenber
-# Edit time:     237 min
+# Last modified: Tue Dec 20 15:59:26 2016 mstenber
+# Edit time:     251 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -200,9 +200,9 @@ class FileINode(inode.INode):
             self._to_block_data(size)
         else:
             self._to_interned_data(size)
-        _debug('set size to %d', self.size)
         if self.leaf_node:
             self.direntry.set_data('st_size', size)
+        _debug('set size to %d', self.size)
         assert self.size == size
 
     @property
@@ -296,7 +296,28 @@ class FileINode(inode.INode):
             n._loaded = True
             self.set_node(n)
             self._write(0, buf)  # no resize
-        self._write(size, b'')
+        if self.stored_size > size:
+            # Grab bytes from the last relevant ofs
+            bofs = size - size % const.BLOCK_SIZE_LIMIT
+            buf = self.read(bofs, size % const.BLOCK_SIZE_LIMIT)
+
+            # Kill all blocks, including the last valid one
+            while True:
+                try:
+                    ll = self.node.last_leaf
+                except IndexError:
+                    break
+                (ofs,) = struct.unpack('>I', ll.key)
+                ofs = ofs * const.BLOCK_SIZE_LIMIT
+                if ofs >= size:
+                    self.node.remove_child(ll)
+                else:
+                    break
+            if buf:
+                self._write(bofs, buf)
+
+        if self.stored_size < size:
+            self._write(size, b'')
 
     def _to_block_data(self, size):
         _debug('_to_block_data %d', size)
@@ -312,8 +333,8 @@ class FileINode(inode.INode):
         s = self._read(0, size, pad=True)
         ln = self.leaf_node
         ln.set_data('minifile', None)
-        ln.set_block_id(None)
         ln.set_block_data(s)
+        self.set_node(None)
 
     def _tree_node_key_data_for_ofs(self, ofs, size):
         n = self.load_node()

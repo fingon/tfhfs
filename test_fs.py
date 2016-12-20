@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Tue Dec 20 13:04:45 2016 mstenber
-# Edit time:     156 min
+# Last modified: Tue Dec 20 15:54:59 2016 mstenber
+# Edit time:     174 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -19,6 +19,7 @@ interface.
 
 import contextlib
 import errno
+import itertools
 import logging
 import os
 
@@ -29,7 +30,8 @@ import forest
 import llfuse
 import ops
 import storage as st
-from util import to_bytes
+from test_ops import SetattrFieldsIsh
+from util import to_bytes, zeropad_bytes
 
 _debug = logging.getLogger(__name__).debug
 
@@ -75,6 +77,16 @@ class MockFile:
 
     def seek(self, ofs):
         self.ofs = ofs
+
+    def truncate(self, pos=None):
+        if pos is None:
+            pos = self.tell()
+        a = llfuse.EntryAttributes()
+        a.st_size = pos
+        f = SetattrFieldsIsh()
+        f.update_size = True
+        self.fs.ops.setattr(self.inode.value, a, f, self.fd,
+                            self.fs.rctx_user)
 
     def write(self, s):
         if not (self.flags & O_BINARY):
@@ -132,6 +144,7 @@ class MockFS:
             fd, attrs = self.ops.create(llfuse.ROOT_INODE, filename,
                                         mode, flags, self.rctx_user)
             assert attrs.st_ino
+        assert fd
         return MockFile(self, fd, flags)
 
     def os_close(self, fd):
@@ -254,26 +267,50 @@ def test_unlink_behavior():
         assert fh1.read() == 'foobar'
 
 
-def test_huge_file():
+@pytest.mark.parametrize('order', list(itertools.permutations((0, 1, 2))))
+def test_huge_file(order):
     """ Test that a HUGE(tm) file reads out all zeroes (and this will not end in tears) """
     hugefilesize = 1e12 + 42  # 1 terabyte
     middlish = hugefilesize // 2 + 13
     mfs = MockFS()
     with mfs.open('file', 'wb') as f:
-        f.write(b'a')
-        f.seek(middlish)
-        f.write(b'b')
-        f.seek(hugefilesize)
-        f.write(b'c')
+        for op in order:
+            if op == 0:
+                f.seek(0)
+                f.write(b'a')
+            elif op == 1:
+                f.seek(middlish)
+                f.write(b'b')
+            elif op == 2:
+                f.seek(hugefilesize)
+                f.write(b'c')
     with mfs.open('file', 'rb') as f:
         assert f.inode.size == hugefilesize + 1
         cnt = 1000
-        assert f.read(cnt) == b'a' + bytes([0] * (cnt - 1))
+        assert f.read(cnt) == zeropad_bytes(cnt, b'a')
         f.seek(middlish)
-        assert f.read(cnt) == b'b' + bytes([0] * (cnt - 1))
+        assert f.read(cnt) == zeropad_bytes(cnt, b'b')
         f.seek(hugefilesize)
         assert f.read() == b'c'
 
+        def _truncate_and_ensure_start_sane(cnt):
+            f.truncate(cnt)
+            assert f.inode.size == cnt
+            assert f.inode.stored_size == f.inode.size
+            f.seek(0)
+            s = f.read(const.BLOCK_SIZE_LIMIT)
+            exp_len = int(min(const.BLOCK_SIZE_LIMIT, cnt))
+            assert s == zeropad_bytes(exp_len, b'a')
+            if cnt > middlish:
+                f.seek(middlish)
+                s = f.read(const.BLOCK_SIZE_LIMIT)
+                exp_len = int(min(const.BLOCK_SIZE_LIMIT, cnt - middlish))
+                assert s == zeropad_bytes(exp_len, b'b')
+
+        _truncate_and_ensure_start_sane(middlish + 5)
+        _truncate_and_ensure_start_sane(const.BLOCK_SIZE_LIMIT - 3)
+        _truncate_and_ensure_start_sane(
+            const.INTERNED_BLOCK_DATA_SIZE_LIMIT - 7)
 
 if __name__ == '__main__':
     # TBD - argument parsing?

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Mon Dec 19 17:00:45 2016 mstenber
-# Edit time:     315 min
+# Last modified: Tue Dec 20 15:19:36 2016 mstenber
+# Edit time:     321 min
 #
 """
 
@@ -39,7 +39,7 @@ http://pythonhosted.org/llfuse/fuse_api.html
 import logging
 import os
 import stat
-from errno import EEXIST, ENOATTR, ENOENT, ENOSYS, ENOTEMPTY, EPERM
+from errno import EEXIST, ENOATTR, ENOENT, ENOTEMPTY, EPERM
 
 import const
 import forest_nodes

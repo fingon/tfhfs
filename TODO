@@ -10,12 +10,6 @@
 
 (Same utility mixin superclass / contained object?)
 
-** Check/test
-
-*** Truncation
-*** Insertion to various places
-*** Reading in clever and unexpected ways
-
 ** Add missing functionality to forest module (e.g. remove API?)
 
 ** Write more thorough filesystem tests to test_ops or elsewhere
@@ -54,6 +48,11 @@ so the remoting will have two modes:
 ** Sticky bit
 
 * Pending (eventually)
+
+** Check/test
+
+*** Insertion to various places (should work but who knows)
+*** Reading in clever and unexpected ways (should work but who knows)
 
 ** Security improvements
 
