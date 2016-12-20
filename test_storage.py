@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Tue Dec 20 15:05:41 2016 mstenber
-# Edit time:     173 min
+# Last modified: Tue Dec 20 16:31:13 2016 mstenber
+# Edit time:     175 min
 #
 """
 
@@ -47,7 +47,7 @@ def _prod_storage(s, flush=_nop):
     assert isinstance(s, st.Storage)
     # By default we retain the block with idk id ('keep')
     if flush is not _nop:
-        s.set_block_id_has_references_callback(lambda x: x == b'idk')
+        s.add_block_id_has_references_callback(lambda x: x == b'idk')
 
     _debug('## initial foo=bar')
     # refcnt = 1
@@ -144,7 +144,7 @@ def _prod_storage(s, flush=_nop):
         assert s.referenced_refcnt0_block_ids
         # Back to class default
         _debug('# no longer referred by inode')
-        s.set_block_id_has_references_callback(None)
+        s.block_id_has_references_callbacks = []  # for testing purposes only
         _flush_twice(s, flush)
         assert not s.referenced_refcnt0_block_ids
         assert not s.get_block_by_id(b'idk')

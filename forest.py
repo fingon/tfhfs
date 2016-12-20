@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Tue Dec 20 16:04:40 2016 mstenber
-# Edit time:     580 min
+# Last modified: Tue Dec 20 16:28:00 2016 mstenber
+# Edit time:     582 min
 #
 """This is the 'forest layer' main module.
 
@@ -70,7 +70,7 @@ class Forest(inode.INodeStore, FDStore):
     def __init__(self, storage, root_inode):
         self.root_inode = root_inode
         self.storage = storage
-        self.storage.set_block_id_has_references_callback(
+        self.storage.add_block_id_has_references_callback(
             self.inode_has_block_id)
         self.storage.set_block_data_references_callback(
             any_node_block_data_references_callback)

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Tue Dec 20 15:13:31 2016 mstenber
-# Edit time:     609 min
+# Last modified: Tue Dec 20 16:30:29 2016 mstenber
+# Edit time:     612 min
 #
 """This is the 'storage layer' main module.
 
@@ -373,6 +373,8 @@ class Storage:
     backend_class = None  # May be set by subclass
 
     def __init__(self, *, backend=None):
+        self.block_id_has_references_callbacks = []
+
         if backend is None:
             cl = self.backend_class
             assert cl
@@ -388,11 +390,17 @@ class Storage:
 
     referenced_refcnt0_block_ids = None
 
+    def add_block_id_has_references_callback(self, callback):
+        assert callback
+        self.block_id_has_references_callbacks.append(callback)
+
     def block_data_references_callback(self, block_data):
         return _nopiterator
 
     def block_id_has_references_callback(self, block_id):
-        pass
+        return any(block_id
+                   for cb in self.block_id_has_references_callbacks
+                   if cb(block_id))
 
     def delete_block_id_if_no_extref(self, block_id):
         """This is the main delete function and should be called if the class
@@ -477,11 +485,6 @@ layer."""
 
     def set_block_data_references_callback(self, callback):
         self.block_data_references_callback = callback
-
-    def set_block_id_has_references_callback(self, callback):
-        self.block_id_has_references_callback = callback
-        if callback is None:
-            del self.block_id_has_references_callback
 
     def set_block_name(self, block_id, n):
         old_block_id = self.get_block_id_by_name(n)
