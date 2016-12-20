@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Tue Dec 20 16:22:19 2016 mstenber
-# Edit time:     181 min
+# Last modified: Tue Dec 20 16:36:22 2016 mstenber
+# Edit time:     182 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -102,7 +102,7 @@ class MockFS:
 
     def __init__(self, *, storage=None):
         storage = storage or st.DictStorage()
-        self.forest = forest.Forest(storage, llfuse.ROOT_INODE)
+        self.forest = forest.Forest(storage)
         self.ops = ops.Operations(self.forest)
         self.rctx_root = llfuse.RequestContext()
         self.rctx_user = llfuse.RequestContext(uid=42, gid=7, pid=123)
@@ -358,7 +358,7 @@ if __name__ == '__main__':
     else:
         storage = st.DictStorage()
 
-    forest = forest.Forest(storage, llfuse.ROOT_INODE)
+    forest = forest.Forest(storage)
     ops = ops.Operations(forest)
     fuse_options = set(llfuse.default_options)
     fuse_options.remove('nonempty')  # TBD..

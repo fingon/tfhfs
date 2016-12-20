@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Tue Dec 20 16:28:00 2016 mstenber
-# Edit time:     582 min
+# Last modified: Tue Dec 20 18:17:53 2016 mstenber
+# Edit time:     645 min
 #
 """This is the 'forest layer' main module.
 
@@ -43,14 +43,12 @@ import stat
 import time
 
 import inode
+import llfuse
 from forest_file import FDStore, FileINode
 from forest_nodes import (DirectoryTreeNode, FileBlockTreeNode, FileData,
                           any_node_block_data_references_callback)
 
 _debug = logging.getLogger(__name__).debug
-
-
-CONTENT_NAME = b'content'
 
 
 class Forest(inode.INodeStore, FDStore):
@@ -67,8 +65,10 @@ class Forest(inode.INodeStore, FDStore):
     directory_node_class = DirectoryTreeNode
     file_node_class = FileBlockTreeNode
 
-    def __init__(self, storage, root_inode):
+    def __init__(self, storage, *,
+                 root_inode=llfuse.ROOT_INODE, content_name=b'content'):
         self.root_inode = root_inode
+        self.content_name = content_name
         self.storage = storage
         self.storage.add_block_id_has_references_callback(
             self.inode_has_block_id)
@@ -80,7 +80,7 @@ class Forest(inode.INodeStore, FDStore):
         FDStore.__init__(self)
         inode.INodeStore.__init__(self, first_free_inode=self.root_inode + 1)
         self.dirty_node_set = set()
-        block_id = self.storage.get_block_id_by_name(CONTENT_NAME)
+        block_id = self.storage.get_block_id_by_name(self.content_name)
         tn = self.directory_node_class(forest=self, block_id=block_id)
         self.root = self.add_inode(tn, value=self.root_inode)
 
@@ -141,7 +141,8 @@ class Forest(inode.INodeStore, FDStore):
         rv = self.root.node.flush()
         if rv:
             _debug(' new content_id %s', self.root.node.block_id)
-            self.storage.set_block_name(self.root.node.block_id, CONTENT_NAME)
+            self.storage.set_block_name(self.root.node.block_id,
+                                        self.content_name)
 
         # TBD: Is there some case where we would not want this?
         self.storage.flush()
@@ -186,6 +187,132 @@ class Forest(inode.INodeStore, FDStore):
                 child_inode.ref()
             return child_inode
 
+    def merge_remote(self, new_other_name, old_other_name):
+        new_id = self.storage.get_block_id_by_name(new_other_name)
+        assert new_id
+        new_f = Forest(self.storage, root_inode=self.root_inode,
+                       content_name=new_other_name)
+        old_f = None
+        old_id = self.storage.get_block_id_by_name(old_other_name)
+        if new_id == old_id:
+            return
+        if old_id:
+            old_f = Forest(self.storage, root_inode=self.root_inode,
+                           content_name=old_other_name)
+        delta = self.merge3(new_f, old_f)
+        self.storage.set_block_name(new_id, old_other_name)
+        return delta
+
+    def merge3(self, new_other, old_other=None):
+        assert not old_other or isinstance(old_other, Forest)
+        assert isinstance(new_other, Forest)
+        # Essentially, we are looking to get 'stuff' from the other,
+        # while updating ourselves IF CHANGE WOULD NOT CONFLICT.
+
+        # These all MUST be in same storage, as we blatantly reuse
+        # objects back and forth. 'self' may be in use, new_other and
+        # old_other are used read-only and should not cause any
+        # mutations to disk.
+        return self.merge3_dir_inode(self.root, new_other.root,
+                                     old_other and old_other.root)
+
+    def merge3_dir_inode(self, inode, new_inode, old_inode):
+        _debug('merge3_dir_inode')
+        # TBD: Do things with metadata
+        # l = leaf from our tree
+        # l2 = leaf from 'new' tree
+        # l3 = leaf from 'old' tree if any
+        delta = 0
+        seen = set()
+
+        def _handle(l, nl):
+            if l is not None:
+                self.unlink(inode, l.name)
+            if nl is None:
+                _debug('  removed')
+                return
+            if l is not None:
+                l.set_forest_rec(None)
+                _debug('  replaced')
+            else:
+                _debug('  added')
+            new_inode.node.remove_child(nl)
+            inode.node.add_child(nl)
+            nl.set_forest_rec(self)
+
+        # First step: Look at what we have
+        for l in list(inode.node.get_leaves()):
+            seen.add(l.key)
+            _debug(' %s', l.name)
+            l2 = new_inode.node.search_name(l.name)
+            if not l2:
+                # Other side does not have it.
+                l3 = old_inode and old_inode.node.search_name(l.name)
+                if l3:
+                    # Remote party removed it, we assume it knows what it is
+                    # doing.
+                    if not l.is_newer_than(l3):
+                        _handle(l, None)
+                        continue
+                # Ok, other end should pick this up? Wait for it..
+                delta += 1
+                continue
+
+            if l.is_same(l2):
+                continue
+
+            if l.is_dir and l2.is_dir:
+                # We can just recurse inside
+                try:
+                    in1 = self.lookup(inode, l.name)
+                    in2 = new_inode.store.lookup(new_inode, l.name)
+                    in3 = old_inode and old_inode.store.lookup(
+                        old_inode, l.name)
+                    delta += self.merge3_dir_inode(in1, in2, in3)
+                finally:
+                    in1.deref()
+                    in2.deref()
+                    if in3:
+                        in3.deref()
+                continue
+
+            # Otherwise we grab the newer of the versions
+            if l2.is_newer_than(l):
+                # Looks like it was replaced? Who knows.  Scary
+                # stuff starts here.
+                _handle(l, l2)
+            else:
+                # We are newer?
+                delta += 1
+
+        for l2 in list(new_inode.node.get_leaves()):
+            if l2.key in seen:
+                continue
+            _debug(' %s', l2.name)
+            l3 = old_inode and old_inode.node.search_name(l2.name)
+            if l3:
+                # We saw it before but we did not want it; we still do not
+                delta += 1
+                continue
+            # Fine, we want this leaf! 'acquire' (no need to recurse)
+            _handle(None, l2)
+        if not delta:
+            l = inode.direntry
+            l2 = new_inode.direntry
+            _debug(' unchanged directory; would like to to merge')
+            if not l.is_same(l2):
+                # Let's try to make it same
+                if l2.is_newer_than(l):
+                    node = new_inode.node
+                    new_inode.set_node(None)
+                    node.set_forest_rec(inode.store)
+                    inode.set_node(node)
+                    _debug('  replaced from remote')
+                else:
+                    delta += 1
+                    _debug('  remote should replace')
+        return delta
+
     def refer_or_store_block_by_data(self, d):
         n = FileData(self, None, d)
         n.perform_flush(in_inode=False)
@@ -194,3 +321,9 @@ class Forest(inode.INodeStore, FDStore):
     def unload_nonprotected_nodes(self):
         protected_set = self.get_protected_set()
         self.root.node.unload_if_possible(protected_set)
+
+    def unlink(self, dir_inode, name):
+        n = dir_inode.node.search_name(name)
+        assert n
+        dir_inode.node.remove_child(n)
+        # TBD: Fix also inodes that refer to this? or not?

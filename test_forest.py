@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Jul  5 11:49:58 2016 mstenber
-# Last modified: Sun Dec 18 20:06:11 2016 mstenber
-# Edit time:     74 min
+# Last modified: Tue Dec 20 18:18:23 2016 mstenber
+# Edit time:     97 min
 #
 """
 
@@ -20,6 +20,8 @@ Test the 'forest' module
 
 import logging
 import stat
+
+import pytest
 
 import forest
 from storage import DictStorage
@@ -35,7 +37,7 @@ class LeafierDirectoryTreeNode(forest.DirectoryTreeNode):
 
 def testforest():
     storage = DictStorage()
-    f = forest.Forest(storage, 42)
+    f = forest.Forest(storage, root_inode=42)
     root = f.get_inode_by_value(42)
     assert root
     root2 = f.root
@@ -51,7 +53,7 @@ def testforest():
 
     assert f.root.node.search_name(b'foo') == file_parent
 
-    f2 = forest.Forest(storage, 42)
+    f2 = forest.Forest(storage, root_inode=42)
     assert not f2.root.node.dirty
     assert f2.lookup(f2.root, b'nonexistent') is None
     f2c = f2.lookup(f2.root, b'foo')
@@ -88,7 +90,7 @@ def testforest():
 
 def test_deepforest():
     storage = DictStorage()
-    f = forest.Forest(storage, 42)
+    f = forest.Forest(storage)
     parent_inode = f.root
     test_depth = 10
     for i in range(test_depth):
@@ -97,7 +99,7 @@ def test_deepforest():
     parent_inode.leaf_node.set_data('foo', 42)
     f.flush()
 
-    f2 = forest.Forest(storage, 42)
+    f2 = forest.Forest(storage)
     parent_inode = f2.root
     for i in range(test_depth):
         _debug('iteration #%d/%d', i + 1, test_depth)
@@ -107,14 +109,61 @@ def test_deepforest():
 
 def test_wideforest():
     storage = DictStorage()
-    f = forest.Forest(storage, 42)
+    f = forest.Forest(storage)
     f.directory_node_class = LeafierDirectoryTreeNode
     test_count = 100
     for i in range(test_count):
         inode = f.create_dir(f.root, name=b'foo%d' % i)
     f.flush()
 
-    f2 = forest.Forest(storage, 7)
+    f2 = forest.Forest(storage)
     for i in range(test_count):
         inode = f2.lookup(f2.root, b'foo%d' % i)
         assert inode
+
+
+@pytest.mark.run(order=0)
+def test_merge3_file():
+    remote_name = b'remote'
+    remote_old_name = b'remote_old'
+
+    _debug('# set up %s', remote_name)
+    storage = DictStorage()
+    rf = forest.Forest(storage, content_name=remote_name)
+    same = rf.create_file(rf.root, name=b'foosame')
+    rm = rf.create_file(rf.root, name=b'foorm')
+    chg = rf.create_file(rf.root, name=b'foochange')
+    rf.flush()
+
+    _debug('# set up local')
+    f = forest.Forest(storage)
+
+    _debug('# attempt merge')
+    f.merge_remote(remote_name, remote_old_name)
+    for n in [same, rm, chg]:
+        assert f.root.node.search_name(n.leaf_node.name)
+    f.flush()
+
+    # should be nop from here on onward (more or less)
+    f.merge_remote(remote_name, remote_old_name)
+
+    rf.create_file(rf.root, name=b'bar').deref()
+
+    # change 'foo' (diff. data)
+    rf.unlink(rf.root, name=chg.leaf_node.name)
+    chg2 = rf.create_file(rf.root, name=chg.leaf_node.name)
+
+    # TBD: remove file
+    rf.unlink(rf.root, name=rm.leaf_node.name)
+    rf.flush()
+
+    f = forest.Forest(storage)
+    _debug('# attempt merge changes')
+    f.merge_remote(remote_name, remote_old_name)
+    exp = [(rm, None), (same, same), (chg2, chg2)]
+    for n, expn in exp:
+        gotde = f.root.node.search_name(n.leaf_node.name)
+        if not expn:
+            assert not gotde
+            continue
+        assert expn.direntry.is_same(gotde)

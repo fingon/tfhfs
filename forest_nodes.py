@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Sun Dec 18 22:16:22 2016 mstenber
-# Edit time:     72 min
+# Last modified: Tue Dec 20 18:16:40 2016 mstenber
+# Edit time:     80 min
 #
 """
 
@@ -138,6 +138,13 @@ class LoadedTreeNode(DirtyMixin, btree.TreeNode):
         self.block_id = block_id
         return True
 
+    def set_forest_rec(self, forest):
+        self.forest = forest
+        if not self._loaded:
+            return
+        for child in self._children:
+            child.set_forest_rec(forest)
+
     def to_data(self):
         t = self.entry_type
         if self.is_leafy:
@@ -203,6 +210,13 @@ class NamedLeafNode(DataMixin, btree.LeafNode):
             self.forest.storage.release_block(self.block_id)
         self.block_id = block_id
 
+    def set_forest_rec(self, forest):
+        self.forest = forest
+        inode = self.forest.getdefault_inode_by_leaf_node(self)
+        if inode:
+            if inode.node:
+                inode.node.set_forest_rec(forest)
+
     def unload_if_possible(self, protected_set):
         inode = self.forest.getdefault_inode_by_leaf_node(self)
         if inode and inode.node:
@@ -218,6 +232,17 @@ class DirectoryEntry(NamedLeafNode):
     @property
     def is_file(self):
         return stat.S_ISREG(self.mode)
+
+    def is_same(self, o):
+        # TBD: Care about something else too?
+        if self.block_id != o.block_id:
+            return False
+        return sorted(self.pickler.get_internal_dict_items(self)) == sorted(o.pickler.get_internal_dict_items(self))
+
+    def is_newer_than(self, o):
+        mtime = self.data.get('st_mtime_ns', 0)
+        o_mtime = o.data.get('st_mtime_ns', 0)
+        return mtime > o_mtime
 
     @property
     def mode(self):

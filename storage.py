@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Tue Dec 20 16:30:29 2016 mstenber
+# Last modified: Tue Dec 20 17:48:19 2016 mstenber
 # Edit time:     612 min
 #
 """This is the 'storage layer' main module.
@@ -459,7 +459,7 @@ class Storage:
 
     def refer_block(self, block_id):
         r = self.get_block_by_id(block_id)
-        assert r
+        assert r, 'block id %s awol' % block_id
         self.set_block_refcnt(block_id, r[1] + 1)
 
     def refer_or_store_block(self, block_id, block_data):

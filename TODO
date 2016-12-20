@@ -39,9 +39,7 @@ so the remoting will have two modes:
 
 ** Implement tree merge code (SHOULD be straightforward, but who knows)
 
-- given 'last point in sync with X', compare current local tree + X's
-  current remote tree top.
-
+*** Bare bones code IS there, but it needs unit tests
 
 * Pending before it can be used (reliably) for multi-user
 

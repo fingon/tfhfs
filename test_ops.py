@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Tue Dec 20 15:23:11 2016 mstenber
-# Edit time:     201 min
+# Last modified: Tue Dec 20 16:36:32 2016 mstenber
+# Edit time:     203 min
 #
 """
 
@@ -67,7 +67,7 @@ class OpsContext:
     def __init__(self):
         self.inodes = {b'.': llfuse.ROOT_INODE}
         storage = DictStorage()
-        self.forest = forest.Forest(storage, llfuse.ROOT_INODE)
+        self.forest = forest.Forest(storage)
         self.ops = ops.Operations(self.forest)
         self.rctx_root = RequestContextIsh()
         self.rctx_user = RequestContextIsh(uid=42, gid=7, pid=123)
@@ -103,7 +103,7 @@ class OpsContext:
         self.ops.release(fd)
 
     def ensure_storage_matches_forest(self):
-        f2 = forest.Forest(self.forest.storage, llfuse.ROOT_INODE)
+        f2 = forest.Forest(self.forest.storage)
         ops2 = ops.Operations(f2).init()
         todo = [(b'.',
                  self.ops.lookup(llfuse.ROOT_INODE, b'.', self.rctx_root),
