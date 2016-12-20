@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Mon Dec 19 15:35:39 2016 mstenber
-# Edit time:     233 min
+# Last modified: Tue Dec 20 15:26:20 2016 mstenber
+# Edit time:     237 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -46,16 +46,10 @@ import struct
 
 import const
 import inode
+import util
 from forest_nodes import FileBlockEntry, FileBlockTreeNode, FileData
 
 _debug = logging.getLogger(__name__).debug
-
-
-def _zeropad(size, s=b''):
-    topad = size - len(s)
-    if topad > 0:
-        s = s + bytes([0] * topad)
-    return s
 
 
 class FDStore:
@@ -191,7 +185,7 @@ class FileINode(inode.INode):
                            const.BLOCK_SIZE_LIMIT - ofs))
         r = d and d[ofs:ofs + size] or b''
         if pad:
-            r = _zeropad(size, r)
+            r = util.zeropad_bytes(size, r)
         _debug('read %d bytes from ofs %d/%d %s',
                len(r), oofs, ofs, pad and '(pad)' or '')
         return r
@@ -260,7 +254,7 @@ class FileINode(inode.INode):
             ns = buf[bufofs:bufofs + bufmax]
             rofs = ofs + len(ns)
             _debug('_replace %d: %d/%d = %d', len(s), ofs, rofs, len(ns))
-            rs = _zeropad(ofs, s[:ofs]) + ns + s[rofs:]
+            rs = util.zeropad_bytes(ofs, s[:ofs]) + ns + s[rofs:]
             ofs += len(ns)
             bufofs += len(ns)
             _debug(' => %d', len(rs))
@@ -330,7 +324,7 @@ class FileINode(inode.INode):
             d = n.content
         else:
             # Non-last nodes are implicitly all zeroes
-            d = _zeropad(size)
+            d = util.zeropad_bytes(size)
         return n, k, d, ofs
 
     def _tree_key_for_ofs(self, ofs, size):

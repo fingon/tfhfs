@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:06:01 2016 mstenber
-# Last modified: Mon Dec 19 16:24:05 2016 mstenber
-# Edit time:     45 min
+# Last modified: Tue Dec 20 15:25:55 2016 mstenber
+# Edit time:     46 min
 #
 """
 
@@ -213,4 +213,11 @@ def to_bytes(s):
     if isinstance(s, str):
         return s.encode()
     assert isinstance(s, bytes)
+    return s
+
+
+def zeropad_bytes(size, s=b''):
+    topad = size - len(s)
+    if topad > 0:
+        s = s + bytes([0] * topad)
     return s
