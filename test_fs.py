@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Tue Dec 20 16:02:13 2016 mstenber
-# Edit time:     176 min
+# Last modified: Tue Dec 20 16:22:19 2016 mstenber
+# Edit time:     181 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -363,6 +363,12 @@ if __name__ == '__main__':
     fuse_options = set(llfuse.default_options)
     fuse_options.remove('nonempty')  # TBD..
     fuse_options.add('fsname=test_fs')
+    # fuse_options.add('large_read') # n/a on OS X?
+    # fuse_options.add('blksize=%d' % const.BLOCK_SIZE_LIMIT) # n/a on OS X?
+    fuse_options.add('max_read=%d' % const.BLOCK_SIZE_LIMIT)
+    fuse_options.add('slow_statfs')
+    # fuse_options.add('novncache') # this works but what does it do?
+    # fuse_options.add('noattrcache')  # this works but what does it do?
     if args.debug:
         fuse_options.add('debug')
     llfuse.init(ops, args.mountpoint, fuse_options)
