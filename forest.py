@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Sun Dec 18 21:58:43 2016 mstenber
-# Edit time:     574 min
+# Last modified: Tue Dec 20 16:04:40 2016 mstenber
+# Edit time:     580 min
 #
 """This is the 'forest layer' main module.
 
@@ -142,6 +142,9 @@ class Forest(inode.INodeStore, FDStore):
         if rv:
             _debug(' new content_id %s', self.root.node.block_id)
             self.storage.set_block_name(self.root.node.block_id, CONTENT_NAME)
+
+        # TBD: Is there some case where we would not want this?
+        self.storage.flush()
 
         # Now that the tree is no longer dirty, we can kill inodes
         # that have no reference (TBD: This could also depend on some
