@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Tue Dec 20 15:54:59 2016 mstenber
-# Edit time:     174 min
+# Last modified: Tue Dec 20 16:02:13 2016 mstenber
+# Edit time:     176 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -351,8 +351,8 @@ if __name__ == '__main__':
             codec = st.CompressingTypedBlockCodec(codec)
         else:
             codec = st.TypedBlockCodec(codec)
-        storage = st.DelayedStorage(st.SQLiteStorage(codec=codec,
-                                                     filename=args.filename))
+        backend = st.SQLiteStorageBackend(codec=codec, filename=args.filename)
+        storage = st.DelayedStorage(backend=backend)
         storage.maximum_cache_size = args.cache_size
 
     else:
