@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Sat Dec 24 12:14:16 2016 mstenber
-# Edit time:     624 min
+# Last modified: Sat Dec 24 21:30:14 2016 mstenber
+# Edit time:     629 min
 #
 """This is the 'storage layer' main module.
 
@@ -37,6 +37,7 @@ import const
 import lz4
 import util
 from endecode import Decoder, Encoder
+from ms.lazy import lazy_property
 from util import getrecsizeof
 
 _debug = logging.getLogger(__name__).debug
@@ -55,6 +56,8 @@ compression+encryption."""
 
 
 class NopBlockCodec(BlockCodec):
+
+    block_id_key = b''
 
     def encode_block(self, block_id, block_data):
         return block_data
@@ -81,6 +84,10 @@ data within.."""
                          iterations=100000,
                          backend=self.backend)
         self.key = kdf.derive(password)
+
+    @property
+    def block_id_key(self):
+        return self.key  # TBD: want to derive key, or use as is?
 
     def encode_block(self, block_id, block_data):
         assert (isinstance(block_id, bytes)
@@ -129,6 +136,10 @@ class TypedBlockCodec(BlockCodec):
 
     def __init__(self, codec):
         self.codec = codec
+
+    @property
+    def block_id_key(self):
+        return self.codec.block_id_key
 
     def encode_block(self, block_id, block_data):
         (t, d) = block_data
@@ -182,6 +193,10 @@ class StorageBackend:
     just does what it does, i.o.w. mutate structures behind it on
     demand.
     """
+
+    @property
+    def block_id_key(self):
+        return b''
 
     def delete_block_id(self, block_id):
         """Delete the block in storage.
@@ -311,6 +326,10 @@ class SQLiteStorageBackend(StorageBackend):
         _debug(' => %s', r)
         return r
 
+    @property
+    def block_id_key(self):
+        return self.codec.block_id_key
+
     def delete_block_id(self, block_id):
         _debug('delete_block_id %s', block_id)
         self._get_execute_result(
@@ -407,6 +426,10 @@ class Storage:
         return any(block_id
                    for cb in self.block_id_has_references_callbacks
                    if cb(block_id))
+
+    @lazy_property
+    def block_id_key(self):
+        return self.backend.block_id_key
 
     def delete_block_id_if_no_extref(self, block_id):
         """This is the main delete function and should be called if the class

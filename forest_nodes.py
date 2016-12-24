@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Sat Dec 24 11:18:29 2016 mstenber
-# Edit time:     118 min
+# Last modified: Sat Dec 24 21:25:22 2016 mstenber
+# Edit time:     119 min
 #
 """
 
@@ -169,7 +169,7 @@ class LoadedTreeNode(BlockIdReferrerMixin, DirtyMixin, btree.TreeNode):
         for child in self.children:
             child.flush()
         data = self.to_data()
-        block_id = sha256(*data)
+        block_id = sha256(self.forest.storage.block_id_key, *data)
         return self.set_block(block_id, data)
 
     @property
@@ -367,7 +367,7 @@ class FileData(DirtyMixin, BlockIdReferrerMixin):
     def perform_flush(self, *, in_inode=True):
         assert self.block_data is not None
         bd = (self.entry_type, self.block_data)
-        bid = sha256(*bd)
+        bid = sha256(self.forest.storage.block_id_key, *bd)
         if self.block_id == bid:
             return
         self.forest.storage.refer_or_store_block(bid, bd)
