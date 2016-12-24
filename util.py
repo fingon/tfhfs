@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:06:01 2016 mstenber
-# Last modified: Sat Dec 24 06:39:46 2016 mstenber
-# Edit time:     60 min
+# Last modified: Sat Dec 24 09:02:45 2016 mstenber
+# Edit time:     61 min
 #
 """
 
@@ -281,5 +281,5 @@ def zeropad_bytes(size, s=b''):
     assert isinstance(s, bytes)
     topad = size - len(s)
     if topad > 0:
-        s = s + bytes([0] * topad)
+        s = s + bytes(topad)
     return s
