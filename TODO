@@ -2,13 +2,33 @@
 
 * Pending (before it can be used for ANYTHING)
 
+** Rename the functions in btree/forest/..
+
+*** Current
+
+_add_child: raw add child node to current node
+ => add_child_nocheck
+
+add_child: add child node to current node, possibly split (and return new node)
+ = same name?
+
+add: add leaf node wherever it wants to be; also returns the root always
+ => add_to_tree
+
+removes are mostly similar, although they do not return anything
+
+_remove_child:
+ => remove_child_nocheck
+
+remove_child:
+ = same name?
+
+remove:
+ => remove_from_tree
+
 ** Fix multi-worker model (sqlite not happy about distinct threads, sigh)
 
 ** Better perf benchmarks.. :p
-
-** Refactor the inode allocation to work like fd allocation - reusing numbers
-
-(Same utility mixin superclass / contained object?)
 
 ** Add missing functionality to forest module (e.g. remove API?)
 

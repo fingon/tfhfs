@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Tue Dec 20 15:19:36 2016 mstenber
-# Edit time:     321 min
+# Last modified: Sat Dec 24 06:38:49 2016 mstenber
+# Edit time:     323 min
 #
 """
 
@@ -139,7 +139,7 @@ class Operations(llfuse.Operations):
     def access(self, inode, mode, ctx, **kw):
         assert self._initialized
         assert mode  # F_OK = 0, but should not show up(?)
-        inode = self.forest.get_inode_by_value(inode)
+        inode = self.forest.inodes.get_by_value(inode)
         return self._de_access(inode.direntry, mode, ctx, **kw)
 
     def _set_de_perms_from_ctx(self, de, ctx):
@@ -153,7 +153,7 @@ class Operations(llfuse.Operations):
                         EPERM)
         _debug('create @i:%s %s m%o f:0x%x %s',
                parent_inode, name, mode, flags, ctx)
-        n = self.forest.get_inode_by_value(parent_inode)
+        n = self.forest.inodes.get_by_value(parent_inode)
         try:
             file_inode = self.forest.lookup(n, name)
             if file_inode:
@@ -183,25 +183,25 @@ class Operations(llfuse.Operations):
             self.forget1(inode, nlookup)
 
     def forget1(self, inode, count=1):
-        self.forest.get_inode_by_value(inode).deref(count)
+        self.forest.inodes.get_by_value(inode).deref(count)
 
     def fsync(self, fh, datasync):
         assert self._initialized
-        self.forest.lookup_fd(fh).flush()
+        self.forest.fds.get_by_value(fh).flush()
 
     def fsyncdir(self, fh, datasync):
         assert self._initialized
-        self.forest.get_inode_by_value(fh).flush()
+        self.forest.inodes.get_by_value(fh).flush()
 
     def getattr(self, inode, ctx):
         assert self._initialized
         # assert_or_errno(self.access(inode, os.R_OK, ctx, or_own=True), EPERM)
-        return self._inode_attributes(self.forest.get_inode_by_value(inode))
+        return self._inode_attributes(self.forest.inodes.get_by_value(inode))
 
     def getxattr(self, inode, name, ctx):
         assert self._initialized
         # assert_or_errno(self.access(inode, os.R_OK, ctx, or_own=True), EPERM)
-        inode = self.forest.get_inode_by_value(inode)
+        inode = self.forest.inodes.get_by_value(inode)
         xa = inode.direntry.data.get('xattr')
         assert_or_errno(xa, ENOATTR)
         v = xa.get(name)
@@ -211,15 +211,15 @@ class Operations(llfuse.Operations):
     def link(self, inode, new_parent_inode, new_name, ctx):
         assert self._initialized
         assert_or_errno(self.access(new_parent_inode, WX_OK, ctx), EPERM)
-        inode = self.forest.get_inode_by_value(inode)
+        inode = self.forest.inodes.get_by_value(inode)
         assert_or_errno(not inode.leaf_node, EEXIST)
-        parent_inode = self.forest.get_inode_by_value(new_parent_inode)
+        parent_inode = self.forest.inodes.get_by_value(new_parent_inode)
         n = parent_inode.node.search_name(new_name)
         if n:
             self.unlink(new_parent_inode, new_name, ctx)
         rn = parent_inode.node
         leaf = rn.leaf_class(self.forest, name=new_name)
-        self.forest.get_inode_by_node(rn).set_node(rn.add(leaf))
+        self.forest.inodes.get_by_node(rn).set_node(rn.add(leaf))
         inode.set_leaf_node(leaf)
         # TBD: This clearly mutilates 'mode' (and other attributes)
         # quite severely as they are essentially default values. Is it
@@ -228,19 +228,19 @@ class Operations(llfuse.Operations):
     def listxattr(self, inode, ctx):
         assert self._initialized
         # assert_or_errno(self.access(inode, os.R_OK, ctx), EPERM)
-        inode = self.forest.get_inode_by_value(inode)
+        inode = self.forest.inodes.get_by_value(inode)
         return inode.direntry.data.get('xattr', {}).keys()
 
     def lookup(self, parent_inode, name, ctx):
         assert self._initialized
         assert_or_errno(self.access(parent_inode, os.X_OK, ctx), EPERM)
-        n = self.forest.get_inode_by_value(parent_inode)
+        n = self.forest.inodes.get_by_value(parent_inode)
         if name == b'.':
             n.ref()
         elif name == b'..':
             cn = n.leaf_node
             if cn:
-                n = self.forest.get_inode_by_node(cn.root).ref()
+                n = self.forest.inodes.get_by_node(cn.root).ref()
             else:
                 n.ref()
         else:
@@ -252,7 +252,7 @@ class Operations(llfuse.Operations):
     def mkdir(self, parent_inode, name, mode, ctx):
         assert self._initialized
         assert_or_errno(self.access(parent_inode, WX_OK, ctx), EPERM)
-        inode = self.forest.get_inode_by_value(parent_inode)
+        inode = self.forest.inodes.get_by_value(parent_inode)
         cn = inode.node.search_name(name)
         assert_or_errno(not cn, EEXIST)
         dir_inode = self.forest.create_dir(inode, name=name,
@@ -264,7 +264,7 @@ class Operations(llfuse.Operations):
         assert self._initialized
         fd, a = self.create(parent_inode, name, mode,
                             os.O_TRUNC | os.O_CREAT, ctx)
-        inode = self.forest.get_inode_by_value(a.st_ino)
+        inode = self.forest.inodes.get_by_value(a.st_ino)
         if stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
             inode.direntry.set_data('st_rdev', rdev)
         self.release(fd)
@@ -274,22 +274,22 @@ class Operations(llfuse.Operations):
         assert self._initialized
         assert_or_errno(self.access(inode, _flags_to_perm(flags), ctx), EPERM)
         _debug('open i:%d f:0x%x %s', inode, flags, ctx)
-        return self.forest.get_inode_by_value(inode).open(flags)
+        return self.forest.inodes.get_by_value(inode).open(flags)
 
     def opendir(self, inode, ctx):
         assert self._initialized
         assert_or_errno(self.access(inode, RX_OK, ctx), EPERM)
-        inode = self.forest.get_inode_by_value(inode)
+        inode = self.forest.inodes.get_by_value(inode)
         inode.ref()
         return inode.value
 
     def read(self, fh, off, size):
         assert self._initialized
-        return self.forest.lookup_fd(fh).read(off, size)
+        return self.forest.fds.get_by_value(fh).read(off, size)
 
     def readdir(self, fh, off):
         assert self._initialized
-        dir_inode = self.forest.get_inode_by_value(fh)
+        dir_inode = self.forest.inodes.get_by_value(fh)
         pln = None
         for i, ln in enumerate(dir_inode.node.get_leaves(), 1):
             # Additions may screw up the tree bit
@@ -303,11 +303,11 @@ class Operations(llfuse.Operations):
                     # If we already have inode for this, we can use it.
                     # If not, we synthesize one that is highly unique
                     # but not really usable anywhere elsewhere (sigh)
-                    inode = self.forest.getdefault_inode_by_leaf_node(ln)
+                    inode = self.forest.inodes.getdefault_by_leaf_node(ln)
                     if inode:
                         a.st_ino = inode.value
                     else:
-                        sbits = self.forest.first_free_inode.bit_length() + 1
+                        sbits = self.forest.inodes.max_value + 1
                         a.st_ino = (i << sbits) | dir_inode.value
                     assert a.st_ino  # otherwise not visible in e.g. ls!
                     yield t
@@ -315,7 +315,7 @@ class Operations(llfuse.Operations):
     def readlink(self, inode, ctx):
         assert self._initialized
         assert_or_errno(self.access(inode, os.R_OK, ctx), EPERM)
-        inode = self.forest.get_inode_by_value(inode)
+        inode = self.forest.inodes.get_by_value(inode)
         fd = self.open(inode.value, os.O_RDONLY, ctx)
         try:
             return self.read(fd, 0, inode.size)
@@ -324,15 +324,15 @@ class Operations(llfuse.Operations):
 
     def release(self, fh):
         assert self._initialized
-        self.forest.lookup_fd(fh).close()
+        self.forest.fds.get_by_value(fh).close()
 
     def releasedir(self, fh):
         assert self._initialized
-        self.forest.get_inode_by_value(fh).deref()
+        self.forest.inodes.get_by_value(fh).deref()
 
     def removexattr(self, inode, name, ctx):
         assert_or_errno(self.access(inode, os.W_OK, ctx, or_own=True), EPERM)
-        inode = self.forest.get_inode_by_value(inode)
+        inode = self.forest.inodes.get_by_value(inode)
         xa = inode.direntry.data.get('xattr', {})
         assert_or_errno(name in xa, ENOATTR)
         del xa[name]
@@ -343,8 +343,8 @@ class Operations(llfuse.Operations):
         assert self._initialized
         assert_or_errno(self.access(parent_inode_old, WX_OK, ctx), EPERM)
         assert_or_errno(self.access(parent_inode_new, WX_OK, ctx), EPERM)
-        parent_inode_old = self.forest.get_inode_by_value(parent_inode_old)
-        parent_inode_new = self.forest.get_inode_by_value(parent_inode_new)
+        parent_inode_old = self.forest.inodes.get_by_value(parent_inode_old)
+        parent_inode_new = self.forest.inodes.get_by_value(parent_inode_new)
         n = self.forest.lookup(parent_inode_old, name_old)
         assert_or_errno(n, ENOENT)
         old_data = n.direntry.data
@@ -363,7 +363,7 @@ class Operations(llfuse.Operations):
     def rmdir(self, parent_inode, name, ctx):
         assert self._initialized
         assert_or_errno(self.access(parent_inode, WX_OK, ctx), EPERM)
-        pn = self.forest.get_inode_by_value(parent_inode)
+        pn = self.forest.inodes.get_by_value(parent_inode)
         n = self.forest.lookup(pn, name)
         assert_or_errno(n, ENOENT)
         try:
@@ -377,7 +377,7 @@ class Operations(llfuse.Operations):
 
     def setattr(self, inode, attr, fields, fh, ctx):
         assert self._initialized
-        inode = self.forest.get_inode_by_value(inode)
+        inode = self.forest.inodes.get_by_value(inode)
         de = inode.direntry
         assert_or_errno(self.access(inode.value, os.W_OK, ctx, or_own=True),
                         EPERM)
@@ -399,7 +399,7 @@ class Operations(llfuse.Operations):
     def setxattr(self, inode, name, value, ctx):
         assert self._initialized
         assert_or_errno(self.access(inode, os.W_OK, ctx, or_own=True), EPERM)
-        inode = self.forest.get_inode_by_value(inode)
+        inode = self.forest.inodes.get_by_value(inode)
         xa = inode.direntry.data.get('xattr', {})
         xa[name] = value
         inode.direntry.set_data('xattr', xa)
@@ -457,7 +457,7 @@ class Operations(llfuse.Operations):
     def unlink(self, parent_inode, name, ctx, *, allow_any=False):
         assert self._initialized
         assert_or_errno(self.access(parent_inode, WX_OK, ctx), EPERM)
-        pn = self.forest.get_inode_by_value(parent_inode)
+        pn = self.forest.inodes.get_by_value(parent_inode)
         n = self.forest.lookup(pn, name)
         assert_or_errno(n, ENOENT)
         try:
@@ -471,4 +471,4 @@ class Operations(llfuse.Operations):
 
     def write(self, fh, off, buf):
         assert self._initialized
-        return self.forest.lookup_fd(fh).write(off, buf)
+        return self.forest.fds.get_by_value(fh).write(off, buf)

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Mon Dec 19 17:31:00 2016 mstenber
-# Edit time:     54 min
+# Last modified: Sat Dec 24 06:47:00 2016 mstenber
+# Edit time:     68 min
 #
 """
 
@@ -34,78 +34,75 @@ import time
 import const
 from btree import LeafNode, TreeNode
 from forest_nodes import DirectoryEntry
+from util import Allocator
 
 _debug = logging.getLogger(__name__).debug
 
 
-class INodeStore:
+class INodeAllocator(Allocator):
     """ INode storage abstraction.
-
-    Essentially part of Forest class, but intentionally abstracted away.
     """
 
-    def __init__(self, first_free_inode):
-        self._value2inode = {}
-        self._node2inode = {}
-        self._lnode2inode = {}
-        self.first_free_inode = first_free_inode
+    def __init__(self, forest, first_free_inode):
+        Allocator.__init__(self, first_free_inode)
+        self.forest = forest
+        self.node2inode = {}
+        self.lnode2inode = {}
         self.inodes_waiting_to_remove = set()
 
-    def add_inode(self, node, *, leaf_node=None, value=None, cl=None):
+    def add_inode(self, node, *, leaf_node=None, cl=None, value=None):
         assert leaf_node is None or isinstance(leaf_node, LeafNode)
-        if value is None:
-            value = self.first_free_inode
-            self.first_free_inode += 1
-        inode = (cl or INode)(self, node, leaf_node, value)
-        self._register_inode(inode)
+        inode = (cl or INode)(self, node, leaf_node)
+        if value:
+            assert inode.value == value
         return inode
 
-    def count(self):
-        return len(self._value2inode)
-
-    def get_inode_by_node(self, node):
+    def get_by_node(self, node):
         assert isinstance(node, TreeNode)
-        return self._node2inode[node]
+        return self.node2inode[node]
 
-    def get_inode_by_leaf_node(self, leaf_node):
+    def get_by_leaf_node(self, leaf_node):
         assert isinstance(leaf_node, LeafNode)
-        return self._lnode2inode[leaf_node]
-
-    def get_inode_by_value(self, value):
-        assert isinstance(value, int)
-        return self._value2inode[value]
+        return self.lnode2inode[leaf_node]
 
     def get_protected_set(self):
         # Every active inode and their path to root is sacrosanct and
         # should not be unloaded (in theory, we could unload non-dirty
         # ones but it does not seem worth it)
         protected_set = set()
-        for inode in self._value2inode.values():
+        for inode in self.value2object.values():
             ln = inode.leaf_node
             while ln is not None:
                 protected_set.add(ln)
                 ln = ln.parent
         _debug('get_protected_set => %d nodes for %d inodes',
-               len(protected_set), len(self._node2inode))
+               len(protected_set), len(self.node2inode))
         return protected_set
 
-    def getdefault_inode_by_node(self, node, default=None):
-        return self._node2inode.get(node, default)
+    def getdefault_by_node(self, node, default=None):
+        return self.node2inode.get(node, default)
 
-    def getdefault_inode_by_leaf_node(self, leaf_node, default=None):
-        return self._lnode2inode.get(leaf_node, default)
+    def getdefault_by_leaf_node(self, leaf_node, default=None):
+        return self.lnode2inode.get(leaf_node, default)
 
-    def getdefault_inode_by_value(self, value, default=None):
-        return self._value2inode.get(value, default)
+    def _inode_leaf_node_changed(self, inode, old_ln, ln):
+        if old_ln:
+            del self.lnode2inode[old_ln]
+        if ln:
+            assert ln not in self.lnode2inode
+            self.lnode2inode[ln] = inode
 
-    def _register_inode(self, inode):
-        self._value2inode[inode.value] = inode
-        n = inode.node
+    def _inode_node_changed(self, inode, old_n, n):
+        if old_n:
+            del self.node2inode[old_n]
         if n:
-            self._node2inode[inode.node] = inode
-        p = inode.leaf_node
-        if p:
-            self._lnode2inode[p] = inode
+            assert n not in self.node2inode
+            self.node2inode[n] = inode
+
+    def register(self, inode):
+        Allocator.register(self, inode)
+        self._inode_node_changed(inode, None, inode.node)
+        self._inode_leaf_node_changed(inode, None, inode.leaf_node)
 
     def remove_old_inodes(self):
         cnt = 0
@@ -119,28 +116,24 @@ class INodeStore:
                 cnt += 1
         return cnt
 
-    def _unregister_inode(self, inode):
-        del self._value2inode[inode.value]
-        n = inode.node
-        if n:
-            del self._node2inode[n]
-        p = inode.leaf_node
-        if p:
-            del self._lnode2inode[p]
+    def unregister(self, inode):
+        Allocator.unregister(self, inode)
+        self._inode_node_changed(inode, inode.node, None)
+        self._inode_leaf_node_changed(inode, inode.leaf_node, None)
 
 
 class INode:
 
     refcnt = 1
 
-    def __init__(self, store, node, leaf_node, value):
+    def __init__(self, store, node, leaf_node):
         self.node = node
         self.leaf_node = leaf_node
-        self.value = value
         self.store = store
         # Add reference to the parent inode; we do not want children dangling
         if leaf_node:
-            self.store.get_inode_by_node(leaf_node.root).ref()
+            self.store.get_by_node(leaf_node.root).ref()
+        self.store.register(self)
         _debug('%s added', self)
 
     def __repr__(self):
@@ -160,7 +153,11 @@ class INode:
 
     def flush(self):
         # TBD: Implement more granual flush; this flushes whole fs!
-        self.store.flush()
+        self.forest.flush()
+
+    @property
+    def forest(self):
+        return self.store.forest
 
     @property
     def direntry(self):
@@ -187,35 +184,32 @@ class INode:
         assert self.refcnt == 0
         # Derefer parent
         if self.leaf_node:
-            self.store.get_inode_by_node(self.leaf_node.root).deref()
+            self.store.get_by_node(self.leaf_node.root).deref()
         # Remove from the store
-        self.store._unregister_inode(self)
+        self.store.unregister(self)
 
     def set_leaf_node(self, node):
         if self.leaf_node is node:
             return
         _debug('%s leaf_node = %s' % (self, node))
-        assert node not in self.store._lnode2inode
         if self.leaf_node:
             self.leaf_node.mark_dirty()
-            del self.store._lnode2inode[self.leaf_node]
             self.leaf_node.set_block_id(None)
+        self.store._inode_leaf_node_changed(self, self.leaf_node, node)
         self.leaf_node = node
         if node:
-            self.store._lnode2inode[node] = self
-            # The node we are associated is dirty .. by association.
             self.leaf_node.mark_dirty()
 
     def set_node(self, node):
         if self.node is node:
             return
         _debug('%s node = %s' % (self, node))
-        assert node not in self.store._node2inode
-        if self.node:
-            del self.store._node2inode[self.node]
+        self.store._inode_node_changed(self, self.node, node)
         self.node = node
-        if self.node:
-            self.store._node2inode[self.node] = self
         if self.leaf_node:
             # The node we are associated is dirty .. by association.
             self.leaf_node.mark_dirty()
+
+    @property
+    def value(self):
+        return self.store.get_value_by_object(self)

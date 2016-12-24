@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Tue Dec 20 15:59:26 2016 mstenber
-# Edit time:     251 min
+# Last modified: Sat Dec 24 06:45:20 2016 mstenber
+# Edit time:     257 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -52,47 +52,15 @@ from forest_nodes import FileBlockEntry, FileBlockTreeNode, FileData
 _debug = logging.getLogger(__name__).debug
 
 
-class FDStore:
-
-    def __init__(self):
-        self.fd2o = {}
-        self.freefds = []
-
-    def allocate_fd(self):
-        if self.freefds:
-            fd = self.freefds.pop(0)
-            _debug('reused free fd #%d', fd)
-        else:
-            fd = len(self.fd2o) + 1
-            _debug('allocated new fd #%d', fd)
-        assert fd not in self.fd2o
-        self.fd2o[fd] = None
-        return fd
-
-    def lookup_fd(self, fd):
-        return self.fd2o[fd]
-
-    def register_fd(self, fd, o):
-        assert o
-        assert self.fd2o[fd] is None
-        self.fd2o[fd] = o
-        _debug('register_fd #%d = %s', fd, o)
-
-    def unregister_fd(self, fd):
-        _debug('unregister_fd #%d', fd)
-        self.freefds.append(fd)
-        del self.fd2o[fd]
-
-
 class FileDescriptor:
     inode = None
 
-    def __init__(self, fd, inode, flags):
+    def __init__(self, inode, flags):
         assert inode
-        self.fd = fd
         self.inode = inode
         self.flags = flags
         self.inode.ref()
+        self.fds.register(self)
 
     def __del__(self):
         # MUST have been closed elsewhere!
@@ -106,13 +74,25 @@ class FileDescriptor:
 
     def close(self):
         assert self.inode is not None
-        self.inode.store.unregister_fd(self.fd)
+        self.fds.unregister(self)
         self.inode.deref()
         del self.inode
 
     def dup(self):
         fd2 = self.inode.open(self.flags & ~os.O_TRUNC)
         return fd2
+
+    @property
+    def fd(self):
+        return self.fds.get_value_by_object(self)
+
+    @property
+    def fds(self):
+        return self.forest.fds
+
+    @property
+    def forest(self):
+        return self.inode.forest
 
     def flush(self):
         self.inode.flush()
@@ -140,19 +120,16 @@ class FileINode(inode.INode):
                 bid = ln.block_id
                 if bid:
                     if self.is_minifile:
-                        self.set_node(FileData(self.store, bid, None))
+                        self.set_node(FileData(self.forest, bid, None))
                     else:
-                        self.set_node(FileBlockTreeNode(self.store, bid))
+                        self.set_node(FileBlockTreeNode(self.forest, bid))
         return self.node
 
     def open(self, flags):
-        assert isinstance(self.store, FDStore)
         if flags & os.O_TRUNC:
             self.set_size(0)
-        fd = self.store.allocate_fd()
-        o = FileDescriptor(fd, self, flags)
-        self.store.register_fd(fd, o)
-        return fd
+        o = FileDescriptor(self, flags)
+        return o.fd
 
     def read(self, ofs, size):
         assert ofs >= 0
@@ -267,7 +244,7 @@ class FileINode(inode.INode):
             ln.set_block_data(s)
         elif isinstance(n, FileData):
             s, bufofs = _replace(n.content, ofs, buf, 0, 0)
-            self.set_node(FileData(self.store, None, s))
+            self.set_node(FileData(self.forest, None, s))
         else:
             _debug(' tree @%d %d', ofs, size)
             cn, k, d, ofs = self._tree_node_key_data_for_ofs(ofs, size)
@@ -275,11 +252,11 @@ class FileINode(inode.INode):
                                  min(size, const.BLOCK_SIZE_LIMIT - ofs))
             # If the child node does not exist, create it and add to tree
             if not cn:
-                cn = FileBlockEntry(self.store, name=k)
+                cn = FileBlockEntry(self.forest, name=k)
                 n.add_child(cn)
-            bid = self.store.refer_or_store_block_by_data(s)
+            bid = self.forest.refer_or_store_block_by_data(s)
             cn.set_block_id(bid)
-            self.store.storage.release_block(bid)
+            self.forest.storage.release_block(bid)
         _debug(' = %d bytes written (result len %d)', bufofs, len(s))
         return bufofs
 
@@ -292,7 +269,7 @@ class FileINode(inode.INode):
             had_size = self.size
             buf = self.read(0, had_size)
             ln.set_block_data(None)
-            n = FileBlockTreeNode(self.store)
+            n = FileBlockTreeNode(self.forest)
             n._loaded = True
             self.set_node(n)
             self._write(0, buf)  # no resize
@@ -326,7 +303,7 @@ class FileINode(inode.INode):
         if ln:
             ln.set_data('minifile', True)
             ln.set_block_data(None)
-        self.set_node(FileData(self.store, None, s))
+        self.set_node(FileData(self.forest, None, s))
 
     def _to_interned_data(self, size):
         _debug('_to_interned_data %d', size)

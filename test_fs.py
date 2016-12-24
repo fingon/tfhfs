@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Tue Dec 20 16:36:22 2016 mstenber
+# Last modified: Sat Dec 24 06:03:19 2016 mstenber
 # Edit time:     182 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
@@ -66,7 +66,7 @@ class MockFile:
 
     @property
     def inode(self):
-        return self.fs.forest.lookup_fd(self.fd).inode
+        return self.fs.forest.fds.get_by_value(self.fd).inode
 
     def read(self, count=const.BLOCK_SIZE_LIMIT * 123):
         r = self.fs.ops.read(self.fd, self.ofs, count)
@@ -152,7 +152,7 @@ class MockFS:
         self.ops.release(fd)
 
     def os_dup(self, fd):
-        return self.ops.forest.lookup_fd(fd).dup()
+        return self.ops.forest.fds.get_by_value(fd).dup()
 
     def os_listdir(self, path):
         assert path == '/'  # no support for subdirs, yet

@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Tue Dec 20 16:36:32 2016 mstenber
+# Last modified: Sat Dec 24 06:37:13 2016 mstenber
 # Edit time:     203 min
 #
 """
@@ -117,8 +117,8 @@ class OpsContext:
             ad2.pop('st_ino')
             _debug(' ad1: %s', ad1)
             _debug(' ad2: %s', ad2)
-            inode1 = self.forest.get_inode_by_value(a1.st_ino)
-            inode2 = f2.get_inode_by_value(a2.st_ino)
+            inode1 = self.forest.inodes.get_by_value(a1.st_ino)
+            inode2 = f2.inodes.get_by_value(a2.st_ino)
             # TBD: What needs to be popped?
             assert ad1 == ad2
             if stat.S_ISDIR(a1.st_mode):
@@ -144,9 +144,9 @@ class OpsContext:
             self.ops.forget1(a1.st_ino)
             ops2.forget1(a2.st_ino)
 
-    def get_inode_counts(self):
+    def inodes_get_counts(self):
         d = {}
-        for n, inode in self.forest._value2inode.items():
+        for n, inode in self.forest.inodes.value2object.items():
             d[n] = inode.refcnt
         return d
 
@@ -161,11 +161,11 @@ class OpsContext:
 @pytest.fixture
 def oc():
     r = OpsContext()
-    pre_counts = r.get_inode_counts()
+    pre_counts = r.inodes_get_counts()
     yield r
     r.forest.flush()
-    assert not r.forest.fd2o
-    post_counts = r.get_inode_counts()
+    assert not r.forest.fds.value2object
+    post_counts = r.inodes_get_counts()
     assert pre_counts == post_counts
     r.ensure_storage_matches_forest()
     r.ops.destroy()

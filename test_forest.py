@@ -38,7 +38,7 @@ class LeafierDirectoryTreeNode(forest.DirectoryTreeNode):
 def testforest():
     storage = DictStorage()
     f = forest.Forest(storage, root_inode=42)
-    root = f.get_inode_by_value(42)
+    root = f.inodes.get_by_value(42)
     assert root
     root2 = f.root
     assert root is root2

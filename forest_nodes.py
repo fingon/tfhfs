@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Tue Dec 20 18:16:40 2016 mstenber
-# Edit time:     80 min
+# Last modified: Sat Dec 24 06:46:36 2016 mstenber
+# Edit time:     85 min
 #
 """
 
@@ -190,7 +190,7 @@ class NamedLeafNode(DataMixin, btree.LeafNode):
             self.block_id = block_id
 
     def perform_flush(self):
-        inode = self.forest.getdefault_inode_by_leaf_node(self)
+        inode = self.forest.inodes.getdefault_by_leaf_node(self)
         if inode:
             c = inode.node
             if c:
@@ -212,13 +212,13 @@ class NamedLeafNode(DataMixin, btree.LeafNode):
 
     def set_forest_rec(self, forest):
         self.forest = forest
-        inode = self.forest.getdefault_inode_by_leaf_node(self)
+        inode = self.forest.inodes.getdefault_by_leaf_node(self)
         if inode:
             if inode.node:
                 inode.node.set_forest_rec(forest)
 
     def unload_if_possible(self, protected_set):
-        inode = self.forest.getdefault_inode_by_leaf_node(self)
+        inode = self.forest.inodes.getdefault_by_leaf_node(self)
         if inode and inode.node:
             inode.node.unload_if_possible(protected_set)
 

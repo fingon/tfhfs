@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:06:01 2016 mstenber
-# Last modified: Tue Dec 20 15:43:14 2016 mstenber
-# Edit time:     46 min
+# Last modified: Sat Dec 24 06:39:46 2016 mstenber
+# Edit time:     60 min
 #
 """
 
@@ -43,6 +43,66 @@ def sha256(*l):
             s = bytes([s])
         h.update(s)
     return h.digest()
+
+
+class Allocator:
+    """Utility which can be used to provide int <-> object mapping.
+
+    Notably, used for both file descriptors and inodes.
+
+    The underlying assumption is that we have a Python object that we
+    _really_ want to use, and do not really need to store anything in
+    the object itself.
+    """
+
+    def __init__(self, start_value=1):
+        self.start_value = start_value
+        self.value2object = {}
+        self.object2value = {}
+        self.free_values = []
+
+    def _allocate(self):
+        if self.free_values:
+            v = self.free_values.pop(0)
+            _debug('reused free v #%d', v)
+        else:
+            v = len(self.value2object) + self.start_value
+            _debug('allocated new v #%d', v)
+        assert v not in self.value2object
+        self.value2object[v] = None
+        return v
+
+    def count(self):
+        return len(self.value2object)
+
+    def get_by_value(self, value):
+        assert isinstance(value, int)
+        return self.value2object[value]
+
+    def getdefault_by_value(self, value, default=None):
+        return self.value2object.get(value, default)
+
+    def get_value_by_object(self, object):
+        return self.object2value[object]
+
+    @property
+    def max_value(self):
+        return self.start_value + len(self.free_values) + len(self.value2object)
+
+    def register(self, o):
+        v = self._allocate()
+        assert self.value2object[v] is None
+        assert o not in self.object2value
+        self.value2object[v] = o
+        self.object2value[o] = v
+        return v
+
+    def unregister(self, o):
+        v = self.get_value_by_object(o)
+        assert o is not None
+        del self.value2object[v]
+        del self.object2value[o]
+        self.free_values.append(v)
 
 
 class DirtyMixin:

@@ -6,7 +6,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Nov 19 10:48:22 2016 mstenber
-# Last modified: Tue Dec 20 09:52:24 2016 mstenber
+# Last modified: Sat Dec 24 06:32:27 2016 mstenber
 # Edit time:     28 min
 #
 #
@@ -34,7 +34,7 @@ clean:
 # -o xfail_strict=True = xpass = fail as well
 
 test: .done.requirements
-	py.test --strict -rx -rw -o xfail_strict=True -n $(CORE_COUNT)
+	py.test --no-print-logs --strict -rx -rw -o xfail_strict=True -n $(CORE_COUNT)
 
 log.txt: .done.requirements $(wildcard *.py)
 	py.test -p no:sugar --strict -rx -rw -o xfail_strict=True -n $(CORE_COUNT) 2>&1 | tee log.txt

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Tue Dec 20 18:17:53 2016 mstenber
-# Edit time:     645 min
+# Last modified: Sat Dec 24 06:37:46 2016 mstenber
+# Edit time:     651 min
 #
 """This is the 'forest layer' main module.
 
@@ -44,14 +44,15 @@ import time
 
 import inode
 import llfuse
-from forest_file import FDStore, FileINode
+from forest_file import FileINode
 from forest_nodes import (DirectoryTreeNode, FileBlockTreeNode, FileData,
                           any_node_block_data_references_callback)
+from util import Allocator
 
 _debug = logging.getLogger(__name__).debug
 
 
-class Forest(inode.INodeStore, FDStore):
+class Forest:
     """Forest maintains the (nested set of) trees.
 
     It also keeps track of the dynamic inode entries; when their
@@ -77,12 +78,12 @@ class Forest(inode.INodeStore, FDStore):
         self.init()
 
     def init(self):
-        FDStore.__init__(self)
-        inode.INodeStore.__init__(self, first_free_inode=self.root_inode + 1)
+        self.fds = Allocator()
+        self.inodes = inode.INodeAllocator(self, self.root_inode)
         self.dirty_node_set = set()
         block_id = self.storage.get_block_id_by_name(self.content_name)
         tn = self.directory_node_class(forest=self, block_id=block_id)
-        self.root = self.add_inode(tn, value=self.root_inode)
+        self.root = self.inodes.add_inode(tn, value=self.root_inode)
 
     def _create(self, mode, dir_inode, name):
         # Create 'content tree' root node for the new child
@@ -99,9 +100,9 @@ class Forest(inode.INodeStore, FDStore):
         # Create leaf node for the tree 'rn'
         rn = dir_inode.node
         assert not rn.parent
-        self.get_inode_by_node(rn).set_node(rn.add(leaf))
-        inode = self.add_inode(node=node, leaf_node=leaf,
-                               cl=((not is_directory) and FileINode))
+        self.inodes.get_by_node(rn).set_node(rn.add(leaf))
+        inode = self.inodes.add_inode(node=node, leaf_node=leaf,
+                                      cl=((not is_directory) and FileINode))
         if node:
             node.mark_dirty()
         leaf.set_data('st_mode', mode)
@@ -131,7 +132,7 @@ class Forest(inode.INodeStore, FDStore):
         while self.dirty_node_set:
             self.dirty_node_set, dns = set(), self.dirty_node_set
             for node in dns:
-                inode = self.get_inode_by_node(node.root)
+                inode = self.inodes.get_by_node(node.root)
                 if inode.leaf_node:
                     inode.leaf_node.mark_dirty()
 
@@ -150,7 +151,7 @@ class Forest(inode.INodeStore, FDStore):
         # Now that the tree is no longer dirty, we can kill inodes
         # that have no reference (TBD: This could also depend on some
         # caching LRU criteria, have to think about it)
-        self.remove_old_inodes()
+        self.inodes.remove_old_inodes()
 
         # Similarly, we can do unloading of nodes that are not needed
         # (the storage should cache what we need anyway, and it is
@@ -164,7 +165,7 @@ class Forest(inode.INodeStore, FDStore):
         # called only when deleting blocks, which should not be that
         # common occurence (assume read-heavy workloads). This could
         # use a lazy property of some kind, perhaps..
-        for node in self._node2inode.keys():
+        for node in self.inodes.node2inode.keys():
             if node.block_id == block_id:
                 return True
 
@@ -173,7 +174,7 @@ class Forest(inode.INodeStore, FDStore):
         assert isinstance(name, bytes)
         n = dir_inode.node.search_name(name)
         if n:
-            child_inode = self.getdefault_inode_by_leaf_node(n)
+            child_inode = self.inodes.getdefault_by_leaf_node(n)
             if child_inode is None:
                 if n.is_dir:
                     cn = self.directory_node_class(forest=self,
@@ -182,7 +183,7 @@ class Forest(inode.INodeStore, FDStore):
                 else:
                     cn = None
                     cl = FileINode
-                child_inode = self.add_inode(cn, leaf_node=n, cl=cl)
+                child_inode = self.inodes.add_inode(cn, leaf_node=n, cl=cl)
             else:
                 child_inode.ref()
             return child_inode
@@ -319,7 +320,7 @@ class Forest(inode.INodeStore, FDStore):
         return n.block_id
 
     def unload_nonprotected_nodes(self):
-        protected_set = self.get_protected_set()
+        protected_set = self.inodes.get_protected_set()
         self.root.node.unload_if_possible(protected_set)
 
     def unlink(self, dir_inode, name):

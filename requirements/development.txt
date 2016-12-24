@@ -1,7 +1,12 @@
 pytest
 pytest-catchlog
+# ^ nice to have debug output etc available
 pytest-sugar
 pytest-xdist
 pytest-timeout
+# ^ timeouts sometimes useful too
 pytest-ordering
+# ^ enable us to run slow tests last
 pytest-profiling
+pytest-cache
+# ^ -lf
