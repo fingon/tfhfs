@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Tue Dec 20 16:31:13 2016 mstenber
-# Edit time:     175 min
+# Last modified: Sat Dec 24 07:16:34 2016 mstenber
+# Edit time:     176 min
 #
 """
 
@@ -204,18 +204,22 @@ class ConfidentialBlockCodecTests(unittest.TestCase):
         plaintext = self.cbc.decode_block(self.block_id, self.ciphertext)
         assert plaintext == self.plaintext
 
-    @pytest.mark.xfail(raises=cryptography.exceptions.InvalidTag)
-    def test_confidential_blockcodec_decode_error_1(self):
-        self.cbc.decode_block(self.block_id + b'42', self.ciphertext)
+    def test_confidential_blockcodec_decode_error_block_id_len(self):
+        with pytest.raises(AssertionError):
+            self.cbc.decode_block(self.block_id + b'42', self.ciphertext)
 
-    @pytest.mark.xfail(raises=cryptography.exceptions.InvalidTag)
-    def test_confidential_blockcodec_decode_error_1(self):
+    def test_confidential_blockcodec_decode_error_block_id_value(self):
+        with pytest.raises(cryptography.exceptions.InvalidTag):
+            self.cbc.decode_block(self.block_id[:-2] + b'42', self.ciphertext)
+
+    def test_confidential_blockcodec_decode_error_block_data(self):
         s = self.ciphertext + b'42'  # 'flawed' input -> cannot pass check
-        self.cbc.decode_block(self.block_id, s)
+        with pytest.raises(cryptography.exceptions.InvalidTag):
+            self.cbc.decode_block(self.block_id, s)
 
-    @pytest.mark.xfail(raises=AssertionError)
-    def test_confidential_blockcodec_decode_error_2(self):
-        self.cbc.decode_block(self.block_id, b'x')
+    def test_confidential_blockcodec_decode_error_garbage(self):
+        with pytest.raises(AssertionError):
+            self.cbc.decode_block(self.block_id, b'x')
 
 
 def test_typeencoding():

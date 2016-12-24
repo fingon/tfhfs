@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Sat Dec 24 06:37:13 2016 mstenber
-# Edit time:     203 min
+# Last modified: Sat Dec 24 07:17:24 2016 mstenber
+# Edit time:     206 min
 #
 """
 
@@ -262,19 +262,22 @@ def test_access(oc, filename, is_root, expect_success):
 # successful create implicitly tested in create of setUp
 
 
-@pytest.mark.xfail(raises=llfuse.FUSEError)
 def testcreate_fail(oc):
-    oc.create(llfuse.ROOT_INODE, b'root_file', oc.rctx_user)
+    with pytest.raises(llfuse.FUSEError) as e:
+        oc.create(llfuse.ROOT_INODE, b'root_file', oc.rctx_user)
+    assert e.value.errno == errno.EPERM
 
 
-@pytest.mark.xfail(raises=llfuse.FUSEError)
 def testopen_fail(oc):
-    oc.ops.open(oc.inodes[b'root_file'], os.O_RDONLY, oc.rctx_user)
+    with pytest.raises(llfuse.FUSEError) as e:
+        oc.ops.open(oc.inodes[b'root_file'], os.O_RDONLY, oc.rctx_user)
+    assert e.value.errno == errno.EPERM
 
 
-@pytest.mark.xfail(raises=llfuse.FUSEError)
 def testmkdir_fail_perm(oc):
-    oc.ops.mkdir(llfuse.ROOT_INODE, b'root_dir', 0, oc.rctx_user)
+    with pytest.raises(llfuse.FUSEError) as e:
+        oc.ops.mkdir(llfuse.ROOT_INODE, b'root_dir', 0, oc.rctx_user)
+    assert e.value.errno == errno.EEXIST
 
 
 def testmkdir_ok(oc):
@@ -282,9 +285,10 @@ def testmkdir_ok(oc):
     oc.ops.forget1(a.st_ino)
 
 
-@pytest.mark.xfail(raises=llfuse.FUSEError)
 def testrmdir_fail_perm(oc):
-    oc.ops.rmdir(llfuse.ROOT_INODE, b'root_dir', oc.rctx_user)
+    with pytest.raises(llfuse.FUSEError) as e:
+        oc.ops.rmdir(llfuse.ROOT_INODE, b'root_dir', oc.rctx_user)
+    assert e.value.errno == errno.EPERM
 
 
 def testrmdir_fail_notempty(oc):
