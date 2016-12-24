@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Sat Dec 24 06:38:49 2016 mstenber
-# Edit time:     323 min
+# Last modified: Sat Dec 24 06:56:49 2016 mstenber
+# Edit time:     324 min
 #
 """
 
@@ -219,7 +219,7 @@ class Operations(llfuse.Operations):
             self.unlink(new_parent_inode, new_name, ctx)
         rn = parent_inode.node
         leaf = rn.leaf_class(self.forest, name=new_name)
-        self.forest.inodes.get_by_node(rn).set_node(rn.add(leaf))
+        self.forest.inodes.get_by_node(rn).add_node_to_tree(leaf)
         inode.set_leaf_node(leaf)
         # TBD: This clearly mutilates 'mode' (and other attributes)
         # quite severely as they are essentially default values. Is it
@@ -370,7 +370,7 @@ class Operations(llfuse.Operations):
             assert_or_errno(n.leaf_node.is_dir, ENOENT)
             assert_or_errno(self._de_access(n.leaf_node, WX_OK, ctx), EPERM)
             assert_or_errno(not n.node.children, ENOTEMPTY)
-            n.leaf_node.root.remove(n.leaf_node)
+            n.leaf_node.root.remove_from_tree(n.leaf_node)
             # TBD: Also check the subdir permission?
         finally:
             n.deref()
@@ -464,7 +464,7 @@ class Operations(llfuse.Operations):
             assert_or_errno(self._de_access(
                 n.direntry, os.W_OK, ctx, or_own=True), EPERM)
             assert_or_errno(n.leaf_node.is_file or allow_any, ENOENT)
-            pn.node.remove(n.leaf_node)
+            pn.node.remove_from_tree(n.leaf_node)
             n.set_leaf_node(None)
         finally:
             n.deref()

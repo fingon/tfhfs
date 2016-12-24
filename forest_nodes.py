@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Sat Dec 24 06:46:36 2016 mstenber
-# Edit time:     85 min
+# Last modified: Sat Dec 24 06:48:57 2016 mstenber
+# Edit time:     86 min
 #
 """
 
@@ -123,7 +123,7 @@ class LoadedTreeNode(DirtyMixin, btree.TreeNode):
                 cls2 = self.__class__
             tn2 = cls2(self.forest)
             tn2.pickler.set_external_dict_to(cd, tn2)
-            self._add_child(tn2, skip_dirty=True)
+            self.add_child_nocheck(tn2, skip_dirty=True)
 
     def search_name(self, name):
         n = self.leaf_class(self.forest, name=name)

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 15:36:58 2016 mstenber
-# Last modified: Tue Dec 20 09:43:17 2016 mstenber
-# Edit time:     306 min
+# Last modified: Sat Dec 24 06:50:38 2016 mstenber
+# Edit time:     308 min
 #
 """This is the 'btree' module.
 
@@ -91,7 +91,7 @@ node. """
         return '<%s >=%s - depth %d>' % (self.__class__.__name__,
                                          self.key, self.depth)
 
-    def _add_child(self, c, *, skip_dirty=False):
+    def add_child_nocheck(self, c, *, skip_dirty=False):
         assert isinstance(c, Node)
         self.csize += c.size
         k = c.key
@@ -106,10 +106,10 @@ node. """
 
     def _pop_child(self, idx):
         c = self.children[idx]
-        self._remove_child(c)
+        self.remove_child_nocheck(c)
         return c
 
-    def _remove_child(self, c):
+    def remove_child_nocheck(self, c):
         assert isinstance(c, Node)
         self.csize -= c.size
         idx = self.child_keys.index(c.key)
@@ -129,7 +129,7 @@ node. """
 
     def add_child(self, c):
         _debug('add_child %s', c)
-        idx = self._add_child(c)
+        idx = self.add_child_nocheck(c)
         if not idx:
             self._update_key_maybe()
         if self.csize <= self.maximum_size:
@@ -137,7 +137,7 @@ node. """
         _debug(' too big, splitting')
         tn = self.create()
         while self.csize > tn.csize:
-            tn._add_child(self._pop_child(-1))
+            tn.add_child_nocheck(self._pop_child(-1))
         tn.key = tn.child_keys[0]
         if self.parent is not None:
             _debug(' did not cause new root')
@@ -146,11 +146,11 @@ node. """
         _debug(' caused new root')
         tn2 = self.create()
         self.key = self.child_keys[0]
-        tn2._add_child(self)
-        tn2._add_child(tn)
+        tn2.add_child_nocheck(self)
+        tn2.add_child_nocheck(tn)
         return tn2
 
-    def add(self, c):
+    def add_to_tree(self, c):
         _debug('adding %s to %s', c, self)
         sc = self.search_prev_or_eq(c)
         if sc:
@@ -223,14 +223,14 @@ should be propagated upwards in the tree)."""
         return False
 
     def remove_child(self, c):
-        self._remove_child(c)
+        self.remove_child_nocheck(c)
         if self.csize >= self.minimum_size:
             return
 
         def _equalize(sib, idx):
             if sib.csize >= self.has_spares_size:
                 while sib.csize >= self.csize:
-                    self._add_child(sib._pop_child(idx))
+                    self.add_child_nocheck(sib._pop_child(idx))
                 if idx == -1:
                     self._update_key_maybe(force=True)
                 else:
@@ -260,7 +260,7 @@ should be propagated upwards in the tree)."""
         # has_spares_size; so remove us instead after adding what is
         # left to the smaller of the siblings
         while self.children:
-            sib._add_child(self._pop_child(0))
+            sib.add_child_nocheck(self._pop_child(0))
 
         sib._update_key_maybe()
 
@@ -270,7 +270,7 @@ should be propagated upwards in the tree)."""
     def size(self):
         return self.header_size + NAME_SIZE
 
-    def remove(self, c):
+    def remove_from_tree(self, c):
         sc = self.search(c)
         assert sc
         sc.parent.remove_child(sc)
@@ -285,9 +285,9 @@ should be propagated upwards in the tree)."""
         # Ok. We did not bail yet -> it seems we are really out of
         # children and might as well merge all their content to ours.
         for c in self.children[:]:
-            self._remove_child(c)
+            self.remove_child_nocheck(c)
             for c2 in c.children:
-                self._add_child(c2)
+                self.add_child_nocheck(c2)
 
         # this is root so  no need to worry about .key handling..
 

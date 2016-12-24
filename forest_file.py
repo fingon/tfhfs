@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Sat Dec 24 06:45:20 2016 mstenber
-# Edit time:     257 min
+# Last modified: Sat Dec 24 06:57:34 2016 mstenber
+# Edit time:     259 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -253,7 +253,7 @@ class FileINode(inode.INode):
             # If the child node does not exist, create it and add to tree
             if not cn:
                 cn = FileBlockEntry(self.forest, name=k)
-                n.add_child(cn)
+                self.add_node_to_tree(cn)
             bid = self.forest.refer_or_store_block_by_data(s)
             cn.set_block_id(bid)
             self.forest.storage.release_block(bid)
@@ -287,7 +287,7 @@ class FileINode(inode.INode):
                 (ofs,) = struct.unpack('>I', ll.key)
                 ofs = ofs * const.BLOCK_SIZE_LIMIT
                 if ofs >= size:
-                    self.node.remove_child(ll)
+                    self.node.remove_from_tree(ll)
                 else:
                     break
             if buf:

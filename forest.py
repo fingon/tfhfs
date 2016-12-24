@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Sat Dec 24 06:37:46 2016 mstenber
-# Edit time:     651 min
+# Last modified: Sat Dec 24 06:56:29 2016 mstenber
+# Edit time:     652 min
 #
 """This is the 'forest layer' main module.
 
@@ -100,7 +100,7 @@ class Forest:
         # Create leaf node for the tree 'rn'
         rn = dir_inode.node
         assert not rn.parent
-        self.inodes.get_by_node(rn).set_node(rn.add(leaf))
+        self.inodes.get_by_node(rn).add_node_to_tree(leaf)
         inode = self.inodes.add_inode(node=node, leaf_node=leaf,
                                       cl=((not is_directory) and FileINode))
         if node:
@@ -237,8 +237,8 @@ class Forest:
                 _debug('  replaced')
             else:
                 _debug('  added')
-            new_inode.node.remove_child(nl)
-            inode.node.add_child(nl)
+            new_inode.node.remove_from_tree(nl)
+            inode.add_node_to_tree(nl)
             nl.set_forest_rec(self)
 
         # First step: Look at what we have
