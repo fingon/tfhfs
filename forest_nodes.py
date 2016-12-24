@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Sat Dec 24 08:45:00 2016 mstenber
-# Edit time:     100 min
+# Last modified: Sat Dec 24 09:00:30 2016 mstenber
+# Edit time:     104 min
 #
 """
 
@@ -69,6 +69,14 @@ class BlockIdReferrerMixin:
         if v and self.forest:
             v = BlockIdReference(self, v)
         self._block_id = v
+
+    def set_forest_rec(self, forest):
+        bid = self.block_id
+        if bid:
+            self.block_id = None
+        self.forest = forest
+        if bid:
+            self.block_id = bid
 
 
 class LoadedTreeNode(BlockIdReferrerMixin, DirtyMixin, btree.TreeNode):
@@ -182,7 +190,7 @@ class LoadedTreeNode(BlockIdReferrerMixin, DirtyMixin, btree.TreeNode):
         return True
 
     def set_forest_rec(self, forest):
-        self.forest = forest
+        BlockIdReferrerMixin.set_forest_rec(self, forest)
         if not self._loaded:
             return
         for child in self._children:
@@ -254,7 +262,7 @@ class NamedLeafNode(BlockIdReferrerMixin, DataMixin, btree.LeafNode):
         self.block_id = block_id
 
     def set_forest_rec(self, forest):
-        self.forest = forest
+        BlockIdReferrerMixin.set_forest_rec(self, forest)
         inode = self.forest.inodes.getdefault_by_leaf_node(self)
         if inode:
             if inode.node:
