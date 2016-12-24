@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Sat Dec 24 11:50:28 2016 mstenber
-# Edit time:     285 min
+# Last modified: Sat Dec 24 18:53:00 2016 mstenber
+# Edit time:     337 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -40,6 +40,7 @@ Shrinking:
 
 """
 
+import concurrent.futures
 import logging
 import os
 import struct
@@ -107,7 +108,15 @@ class FileDescriptor:
         return bufofs
 
 
-class FileINode(inode.INode):
+def _maybe_threaded_map(fun, l):
+    l = list(l)
+    if len(l) > 2:
+        with concurrent.futures.ThreadPoolExecutor() as e:
+            return e.map(fun, l)
+    return map(fun, l)
+
+
+class FileINode(util.DirtyMixin, inode.INode):
 
     @property
     def is_minifile(self):
@@ -125,11 +134,39 @@ class FileINode(inode.INode):
                         self.set_node(FileBlockTreeNode(self.forest, bid))
         return self.node
 
+    def mark_dirty_related(self):
+        self.forest.dirty_file_set.add(self)
+
     def open(self, flags):
         if flags & os.O_TRUNC:
             self.set_size(0)
         o = FileDescriptor(self, flags)
         return o.fd
+
+    def perform_flush(self):
+        if not self._write_blocks:
+            return
+        _debug('%s perform_flush (%d blocks))', self, len(self._write_blocks))
+
+        def _rewrite_pending_one(t):
+            k, (cn, s) = t
+            _debug(' %s = %d bytes', k, len(s))
+            # If the child node does not exist, create it and add to tree
+            if not cn:
+                cn = FileBlockEntry(self.forest, name=k)
+                self.add_node_to_tree(cn)
+            return cn, s
+
+        def _store_entry(t):
+            (cn, s) = t
+            bid = self.forest.refer_or_store_block_by_data(s)
+            cn.set_block_id(bid)
+            self.forest.storage.release_block(bid)
+
+        pending_stores = [_rewrite_pending_one(t)
+                          for t in self._write_blocks.items()]
+        list(_maybe_threaded_map(_store_entry, pending_stores))
+        del self._write_blocks
 
     def read(self, ofs, size):
         assert ofs >= 0
@@ -170,6 +207,8 @@ class FileINode(inode.INode):
     def set_size(self, size, minimum_size=None):
         if self.size == size:
             return
+        if minimum_size is None:
+            self.flush()
         if size > const.BLOCK_SIZE_LIMIT:
             # Should be node tree, or convert to one
             self._to_block_tree(size, minimum_size)
@@ -182,6 +221,14 @@ class FileINode(inode.INode):
         _debug('set size to %d', self.size)
         assert self.size == size
 
+    _write_blocks = None
+
+    def set_write_block(self, node, name, data):
+        if self._write_blocks is None:
+            self._write_blocks = {}
+        _debug('stored %d bytes for %s', len(data), name)
+        self._write_blocks[name] = [node, data]
+
     @property
     def size(self):
         if self.leaf_node:
@@ -190,6 +237,7 @@ class FileINode(inode.INode):
 
     @property
     def stored_size(self):
+        self.flush()
         n = self.load_node()
         if n is None:
             bd = self.leaf_node.block_data or b''
@@ -252,13 +300,8 @@ class FileINode(inode.INode):
             cn, k, d, ofs = self._tree_node_key_data_for_ofs(ofs, size)
             s, bufofs = _replace(d, ofs, buf, bufofs,
                                  min(size, const.BLOCK_SIZE_LIMIT - ofs))
-            # If the child node does not exist, create it and add to tree
-            if not cn:
-                cn = FileBlockEntry(self.forest, name=k)
-                self.add_node_to_tree(cn)
-            bid = self.forest.refer_or_store_block_by_data(s)
-            cn.set_block_id(bid)
-            self.forest.storage.release_block(bid)
+            self.mark_dirty()
+            self.set_write_block(node=cn, name=k, data=s)
         wrote = bufofs - obufofs
         _debug(' = %d bytes written (result len %d)', wrote, len(s))
         return wrote
@@ -280,6 +323,7 @@ class FileINode(inode.INode):
         else:
             ssize = self.size
         if ssize > size:
+            self.flush()
             # Grab bytes from the last relevant ofs
             bofs = size - size % const.BLOCK_SIZE_LIMIT
             buf = self.read(bofs, size % const.BLOCK_SIZE_LIMIT)
@@ -298,6 +342,7 @@ class FileINode(inode.INode):
                     break
             if buf:
                 self._write(bofs, buf)
+            self.flush()
             ssize = self.stored_size
         # If we know we are planning to write the bytes in
         # [minimum_size, size[ range, no need to care about writing to
@@ -315,6 +360,8 @@ class FileINode(inode.INode):
             ln.set_data('minifile', True)
             ln.set_block_data(None)
         self.set_node(FileData(self.forest, None, s))
+        if self._write_blocks:
+            del self._write_blocks
 
     def _to_interned_data(self, size):
         _debug('_to_interned_data %d', size)
@@ -323,17 +370,23 @@ class FileINode(inode.INode):
         ln.set_data('minifile', None)
         ln.set_block_data(s)
         self.set_node(None)
+        if self._write_blocks:
+            del self._write_blocks
 
     def _tree_node_key_data_for_ofs(self, ofs, size):
         n = self.load_node()
         assert isinstance(n, FileBlockTreeNode)
         k, ofs, size = self._tree_key_for_ofs(ofs, size)
-        n = n.search_name(k)
-        if n:
-            d = n.content
+        t = (self._write_blocks or {}).get(k)
+        if t:
+            n, d = t
         else:
-            # Non-last nodes are implicitly all zeroes
-            d = bytes(size)
+            n = n.search_name(k)
+            if n:
+                d = n.content
+            else:
+                # Non-last nodes are implicitly all zeroes
+                d = bytes(size)
         return n, k, d, ofs
 
     def _tree_key_for_ofs(self, ofs, size):

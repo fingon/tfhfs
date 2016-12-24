@@ -32,7 +32,13 @@ time ( find /tmp/x -type f | xargs cat > /dev/null )
 
 # 24.12.2016
 
-## current git commit
+## git commit HEAD
+
+### in-memory, no compression
+
+(test#3) ~150MB/s write (10MB blocksize)
+
+## git commit <= 0afebfdd8e97fe913cb486ac8f3a14620ff96317
 
 ### in-memory, no compression
 

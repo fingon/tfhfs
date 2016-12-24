@@ -43,6 +43,13 @@ so the remoting will have two modes:
 
 * Pending (eventually)
 
+** Performance improvement ideas
+
+*** Rethink the parallelization scheme
+
+.. for now, we do just parallel sha256, which seems to provide 'nice'
+performance, but is it nice enough?
+
 ** Check/test
 
 *** Insertion to various places (should work but who knows)

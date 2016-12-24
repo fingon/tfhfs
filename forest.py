@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Sat Dec 24 09:55:20 2016 mstenber
-# Edit time:     663 min
+# Last modified: Sat Dec 24 18:12:43 2016 mstenber
+# Edit time:     668 min
 #
 """This is the 'forest layer' main module.
 
@@ -86,6 +86,7 @@ class Forest:
         self.fds = Allocator()
         self.inodes = inode.INodeAllocator(self, self.root_inode)
         self.dirty_node_set = set()
+        self.dirty_file_set = set()
         block_id = self.storage.get_block_id_by_name(self.content_name)
         tn = self.directory_node_class(forest=self, block_id=block_id)
         self.root = self.inodes.add_inode(tn, value=self.root_inode)
@@ -135,8 +136,17 @@ class Forest:
             print('flush')
             import time
             t = time.time()
-        # Three stages:
-        # - first we propagate dirty nodes towards the root
+
+        # Four stages:
+        # - flush dirty file inodes
+        for file_inode in self.dirty_file_set:
+            file_inode.flush()
+
+        if PRINT_DEBUG_FLUSH:
+            print(' .. %d files' % len(self.dirty_file_set), time.time() - t)
+        self.dirty_file_set = set()
+
+        # - we propagate dirty nodes towards the root
         while self.dirty_node_set:
             self.dirty_node_set, dns = set(), self.dirty_node_set
             for node in dns:
@@ -145,7 +155,7 @@ class Forest:
                     inode.leaf_node.mark_dirty()
 
         if PRINT_DEBUG_FLUSH:
-            print(' .. dirtied', time.time() - t)
+            print(' .. dirty propagation', time.time() - t)
 
         # Then we call the root node's flush method, which
         # - propagates the calls back down the tree, updates block ids, and
