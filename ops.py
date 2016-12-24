@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Sat Dec 24 06:56:49 2016 mstenber
-# Edit time:     324 min
+# Last modified: Sat Dec 24 07:38:08 2016 mstenber
+# Edit time:     327 min
 #
 """
 
@@ -307,7 +307,10 @@ class Operations(llfuse.Operations):
                     if inode:
                         a.st_ino = inode.value
                     else:
-                        sbits = self.forest.inodes.max_value + 1
+                        sbits = self.forest.inodes.max_value.bit_length() + 1
+                        ino_bits = llfuse.get_ino_t_bits()
+                        if sbits < ino_bits / 2:
+                            sbits = ino_bits // 2
                         a.st_ino = (i << sbits) | dir_inode.value
                     assert a.st_ino  # otherwise not visible in e.g. ls!
                     yield t
