@@ -4,3 +4,4 @@ pytest-sugar
 pytest-xdist
 pytest-timeout
 pytest-ordering
+pytest-profiling
