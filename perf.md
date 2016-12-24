@@ -17,6 +17,12 @@ time ( find /tmp/x -type f | xargs cat > /dev/null )
 
 # 24.12.2016
 
+## git commit 4ac41780c8a14b4f796832327b94d0c7b111af7e
+
+### in-memory, no compression
+
+40MB/s write (20% of time spent in SHA256)
+
 ## git commit 602f3a069332446ed6bfee13dbbfdcf27edf82ed
 
 ### in-memory, no compression
