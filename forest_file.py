@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Sat Dec 24 10:35:29 2016 mstenber
-# Edit time:     268 min
+# Last modified: Sat Dec 24 11:35:47 2016 mstenber
+# Edit time:     276 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -231,7 +231,8 @@ class FileINode(inode.INode):
             ns = buf[bufofs:bufofs + bufmax]
             rofs = ofs + len(ns)
             _debug('_replace %d: %d/%d = %d', len(s), ofs, rofs, len(ns))
-            rs = util.zeropad_bytes(ofs, s[:ofs]) + ns + s[rofs:]
+            topad = max(0, ofs - len(s))
+            rs = b'%s%s%s%s' % (s[:ofs], bytes(topad), ns, s[rofs:])
             ofs += len(ns)
             bufofs += len(ns)
             _debug(' => %d', len(rs))
@@ -273,7 +274,9 @@ class FileINode(inode.INode):
             n._loaded = True
             self.set_node(n)
             self._write(0, buf)  # no resize
-        ssize = self.stored_size
+            ssize = self.stored_size
+        else:
+            ssize = self.size
         if ssize > size:
             # Grab bytes from the last relevant ofs
             bofs = size - size % const.BLOCK_SIZE_LIMIT
@@ -328,7 +331,7 @@ class FileINode(inode.INode):
             d = n.content
         else:
             # Non-last nodes are implicitly all zeroes
-            d = util.zeropad_bytes(size)
+            d = bytes(size)
         return n, k, d, ofs
 
     def _tree_key_for_ofs(self, ofs, size):

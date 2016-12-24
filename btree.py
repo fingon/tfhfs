@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 15:36:58 2016 mstenber
-# Last modified: Sat Dec 24 06:50:38 2016 mstenber
-# Edit time:     308 min
+# Last modified: Sat Dec 24 11:30:08 2016 mstenber
+# Edit time:     313 min
 #
 """This is the 'btree' module.
 
@@ -91,12 +91,13 @@ node. """
         return '<%s >=%s - depth %d>' % (self.__class__.__name__,
                                          self.key, self.depth)
 
-    def add_child_nocheck(self, c, *, skip_dirty=False):
+    def add_child_nocheck(self, c, *, skip_dirty=False, idx=None):
         assert isinstance(c, Node)
         self.csize += c.size
         k = c.key
         assert k
-        idx = bisect.bisect(self.child_keys, k)
+        if idx is None:
+            idx = bisect.bisect(self.child_keys, k)
         self.child_keys.insert(idx, k)
         self.children.insert(idx, c)
         c.parent = self
@@ -106,13 +107,14 @@ node. """
 
     def _pop_child(self, idx):
         c = self.children[idx]
-        self.remove_child_nocheck(c)
+        self.remove_child_nocheck(c, idx=idx)
         return c
 
-    def remove_child_nocheck(self, c):
+    def remove_child_nocheck(self, c, *, idx=None):
         assert isinstance(c, Node)
         self.csize -= c.size
-        idx = self.child_keys.index(c.key)
+        if idx is None:
+            idx = self.child_keys.index(c.key)
         del self.children[idx]
         del self.child_keys[idx]
         self.mark_dirty()
@@ -137,7 +139,7 @@ node. """
         _debug(' too big, splitting')
         tn = self.create()
         while self.csize > tn.csize:
-            tn.add_child_nocheck(self._pop_child(-1))
+            tn.add_child_nocheck(self._pop_child(-1), idx=0)
         tn.key = tn.child_keys[0]
         if self.parent is not None:
             _debug(' did not cause new root')
@@ -146,8 +148,8 @@ node. """
         _debug(' caused new root')
         tn2 = self.create()
         self.key = self.child_keys[0]
-        tn2.add_child_nocheck(self)
-        tn2.add_child_nocheck(tn)
+        tn2.add_child_nocheck(self, idx=0)
+        tn2.add_child_nocheck(tn, idx=1)
         return tn2
 
     def add_to_tree(self, c):

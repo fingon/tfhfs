@@ -1,12 +1,10 @@
-Hardware: nMP (2013 Mac Pro), enough RAM, fast enough SSD
+Hardware: 2013 Mac Pro, enough RAM, fast enough SSD
 
 # Test #1
 
 Test dataset: 1626MB of text files (~4500)
 
 ## write
-
-- fresh mount /tmp/x
 
 time rsync -av ~/bat/logs /tmp/x/
 
@@ -18,7 +16,15 @@ Test dataset: OS X El Capitan images, 6GB?
 
 time rsync -av /Users/mstenber/software/mac/10-11-elcapitan /tmp/x/
 
-# read test
+# Test #3
+
+Just El Capitan .dmg, 6GB-ish, no rsync, but dd instead
+
+## write
+
+time dd if=/Users/mstenber/software/mac/10-11-elcapitan/Install\ OS\ X\ El\ Capitan.app/Contents/SharedSupport/InstallESD.dmg of=/tmp/x/foo.dat bs=1024000
+
+# read step for all tests
 
 - fresh mount /tmp/x
 
@@ -26,13 +32,25 @@ time ( find /tmp/x -type f | xargs cat > /dev/null )
 
 # 24.12.2016
 
-## git commit 4ac41780c8a14b4f796832327b94d0c7b111af7e
+## current git commit
+
+(test#3) 77MB/s write (10MB blocksize)
+
+## git commit ~4ac41780c8a14b4f796832327b94d0c7b111af7e
+
+### NO WRITE CODE AT ALL (testing cost of fuse + calling llfuse ops)
+
+(test#2) 70MB/s write
+(test#3) 103 MB/s write (1MB blocksize)
+(test#3) 348MB/s write (10MB blocksize)
+(test#3) 351MB/s write (100MB blocksize)
 
 ### in-memory, no compression
 
 (test#1) 40MB/s write (20% of time spent in SHA256)
 (test#1) 42MB/s write (no profiling)
 (test#2) 56MB/s write (no profiling)
+(test#3) 76MB/s write (10MB blocksize)
 
 ## git commit 602f3a069332446ed6bfee13dbbfdcf27edf82ed
 

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Sat Dec 24 09:56:45 2016 mstenber
-# Edit time:     114 min
+# Last modified: Sat Dec 24 11:18:29 2016 mstenber
+# Edit time:     118 min
 #
 """
 
@@ -77,7 +77,6 @@ class BlockIdReferrerMixin:
             return
         if isinstance(self._block_id, BlockIdReference):
             self._block_id.unregister()
-            del self._block_id
         if v and self.forest:
             v = BlockIdReference(self, v)
         self._block_id = v
