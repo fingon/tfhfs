@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Sat Dec 24 08:26:46 2016 mstenber
-# Edit time:     661 min
+# Last modified: Sat Dec 24 09:55:20 2016 mstenber
+# Edit time:     663 min
 #
 """This is the 'forest layer' main module.
 
@@ -42,6 +42,7 @@ import collections
 import logging
 import stat
 import time
+import weakref
 
 import inode
 import llfuse
@@ -81,7 +82,7 @@ class Forest:
         self.init()
 
     def init(self):
-        self.block_id_references = collections.defaultdict(set)
+        self.block_id_references = collections.defaultdict(weakref.WeakSet)
         self.fds = Allocator()
         self.inodes = inode.INodeAllocator(self, self.root_inode)
         self.dirty_node_set = set()

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Sat Dec 24 09:00:30 2016 mstenber
-# Edit time:     104 min
+# Last modified: Sat Dec 24 09:56:45 2016 mstenber
+# Edit time:     114 min
 #
 """
 
@@ -20,6 +20,7 @@ These are the btree node subclasses employed by the Forest class.
 
 import logging
 import stat
+import weakref
 
 import btree
 import const
@@ -29,21 +30,33 @@ _debug = logging.getLogger(__name__).debug
 
 
 class BlockIdReference:
-    node = None
+    forest = None
 
     def __init__(self, node, block_id):
-        self.node = node
+        self._node = weakref.ref(node)
+        self.forest = node.forest
         self.value = block_id
-        self.node.forest.block_id_references[self.value].add(self)
+        self.forest.block_id_references[self.value].add(self)
+
+    def __del__(self):
+        if self.forest:
+            try:
+                self.unregister()
+            except KeyError:
+                # If our weakref is already gone, it is hopefully all good..
+                pass
+
+    @property
+    def node(self):
+        return self._node()
 
     def unregister(self):
-        assert self.node is not None
-        d = self.node.forest.block_id_references[self.value]
-        if len(d) == 1:
-            del self.node.forest.block_id_references[self.value]
-        else:
-            d.remove(self)
-        del self.node
+        assert self.forest is not None
+        d = self.forest.block_id_references[self.value]
+        d.remove(self)
+        if not d:
+            del self.forest.block_id_references[self.value]
+        del self.forest
 
 
 class BlockIdReferrerMixin:
@@ -52,11 +65,10 @@ class BlockIdReferrerMixin:
     @property
     def block_id(self):
         bid = self._block_id
-        if not bid:
-            return bid
-        if isinstance(bid, BlockIdReference):
-            return bid.value
-        assert isinstance(bid, bytes)
+        if bid:
+            if isinstance(bid, BlockIdReference):
+                return bid.value
+            assert isinstance(bid, bytes)
         return bid
 
     @block_id.setter

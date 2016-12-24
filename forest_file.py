@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Sat Dec 24 06:57:34 2016 mstenber
-# Edit time:     259 min
+# Last modified: Sat Dec 24 10:35:29 2016 mstenber
+# Edit time:     268 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -167,12 +167,12 @@ class FileINode(inode.INode):
                len(r), oofs, ofs, pad and '(pad)' or '')
         return r
 
-    def set_size(self, size):
+    def set_size(self, size, minimum_size=None):
         if self.size == size:
             return
         if size > const.BLOCK_SIZE_LIMIT:
             # Should be node tree, or convert to one
-            self._to_block_tree(size)
+            self._to_block_tree(size, minimum_size)
         elif size > const.INTERNED_BLOCK_DATA_SIZE_LIMIT or not self.leaf_node:
             self._to_block_data(size)
         else:
@@ -210,7 +210,7 @@ class FileINode(inode.INode):
         size = len(buf)
         nsize = ofs + size
         if self.size < nsize:
-            self.set_size(nsize)
+            self.set_size(nsize, minimum_size=ofs)
         done = 0
         while done < len(buf):
             wrote = self._write(ofs + done, buf[done:])
@@ -260,8 +260,8 @@ class FileINode(inode.INode):
         _debug(' = %d bytes written (result len %d)', bufofs, len(s))
         return bufofs
 
-    def _to_block_tree(self, size):
-        _debug('_to_block_tree %d', size)
+    def _to_block_tree(self, size, minimum_size=None):
+        _debug('_to_block_tree %d (%s)', size, minimum_size)
         ln = self.leaf_node
         if not isinstance(self.load_node(), FileBlockTreeNode):
             ln.set_data('minifile', None)
@@ -273,7 +273,8 @@ class FileINode(inode.INode):
             n._loaded = True
             self.set_node(n)
             self._write(0, buf)  # no resize
-        if self.stored_size > size:
+        ssize = self.stored_size
+        if ssize > size:
             # Grab bytes from the last relevant ofs
             bofs = size - size % const.BLOCK_SIZE_LIMIT
             buf = self.read(bofs, size % const.BLOCK_SIZE_LIMIT)
@@ -292,8 +293,13 @@ class FileINode(inode.INode):
                     break
             if buf:
                 self._write(bofs, buf)
-
-        if self.stored_size < size:
+            ssize = self.stored_size
+        # If we know we are planning to write the bytes in
+        # [minimum_size, size[ range, no need to care about writing to
+        # tree here.
+        if minimum_size is not None:
+            size = minimum_size
+        if ssize < size:
             self._write(size, b'')
 
     def _to_block_data(self, size):
