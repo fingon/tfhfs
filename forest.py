@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Sat Dec 24 06:56:29 2016 mstenber
-# Edit time:     652 min
+# Last modified: Sat Dec 24 08:26:46 2016 mstenber
+# Edit time:     661 min
 #
 """This is the 'forest layer' main module.
 
@@ -38,6 +38,7 @@ particular (file) inode.
 
 """
 
+import collections
 import logging
 import stat
 import time
@@ -50,6 +51,8 @@ from forest_nodes import (DirectoryTreeNode, FileBlockTreeNode, FileData,
 from util import Allocator
 
 _debug = logging.getLogger(__name__).debug
+
+PRINT_DEBUG_FLUSH = True
 
 
 class Forest:
@@ -78,6 +81,7 @@ class Forest:
         self.init()
 
     def init(self):
+        self.block_id_references = collections.defaultdict(set)
         self.fds = Allocator()
         self.inodes = inode.INodeAllocator(self, self.root_inode)
         self.dirty_node_set = set()
@@ -126,7 +130,10 @@ class Forest:
         return self._create(mode, dir_inode, name)
 
     def flush(self):
-        _debug('flush')
+        if PRINT_DEBUG_FLUSH:
+            print('flush')
+            import time
+            t = time.time()
         # Three stages:
         # - first we propagate dirty nodes towards the root
         while self.dirty_node_set:
@@ -136,6 +143,9 @@ class Forest:
                 if inode.leaf_node:
                     inode.leaf_node.mark_dirty()
 
+        if PRINT_DEBUG_FLUSH:
+            print(' .. dirtied', time.time() - t)
+
         # Then we call the root node's flush method, which
         # - propagates the calls back down the tree, updates block ids, and
         # - gets back up the tree with fresh block ids.
@@ -144,9 +154,13 @@ class Forest:
             _debug(' new content_id %s', self.root.node.block_id)
             self.storage.set_block_name(self.root.node.block_id,
                                         self.content_name)
+        if PRINT_DEBUG_FLUSH:
+            print(' .. tree flushed', time.time() - t)
 
         # TBD: Is there some case where we would not want this?
         self.storage.flush()
+        if PRINT_DEBUG_FLUSH:
+            print(' .. storage flushed', time.time() - t)
 
         # Now that the tree is no longer dirty, we can kill inodes
         # that have no reference (TBD: This could also depend on some
@@ -158,15 +172,13 @@ class Forest:
         # much more efficient in terms of memory usage than raw Python
         # data structures)
         self.unload_nonprotected_nodes()
+        if PRINT_DEBUG_FLUSH:
+            print('took', time.time() - t)
         return rv
 
     def inode_has_block_id(self, block_id):
-        # TBD: This is not super efficient. However, it SHOULD be
-        # called only when deleting blocks, which should not be that
-        # common occurence (assume read-heavy workloads). This could
-        # use a lazy property of some kind, perhaps..
-        for node in self.inodes.node2inode.keys():
-            if node.block_id == block_id:
+        for bref in self.block_id_references.get(block_id, []):
+            if self.inodes.getdefault_by_node(bref.node):
                 return True
 
     def lookup(self, dir_inode, name):

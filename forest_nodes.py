@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Sat Dec 24 06:48:57 2016 mstenber
-# Edit time:     86 min
+# Last modified: Sat Dec 24 08:45:00 2016 mstenber
+# Edit time:     100 min
 #
 """
 
@@ -28,7 +28,50 @@ from util import CBORPickler, DataMixin, DirtyMixin, sha256
 _debug = logging.getLogger(__name__).debug
 
 
-class LoadedTreeNode(DirtyMixin, btree.TreeNode):
+class BlockIdReference:
+    node = None
+
+    def __init__(self, node, block_id):
+        self.node = node
+        self.value = block_id
+        self.node.forest.block_id_references[self.value].add(self)
+
+    def unregister(self):
+        assert self.node is not None
+        d = self.node.forest.block_id_references[self.value]
+        if len(d) == 1:
+            del self.node.forest.block_id_references[self.value]
+        else:
+            d.remove(self)
+        del self.node
+
+
+class BlockIdReferrerMixin:
+    _block_id = None
+
+    @property
+    def block_id(self):
+        bid = self._block_id
+        if not bid:
+            return bid
+        if isinstance(bid, BlockIdReference):
+            return bid.value
+        assert isinstance(bid, bytes)
+        return bid
+
+    @block_id.setter
+    def block_id(self, v):
+        if self.block_id == v:
+            return
+        if isinstance(self._block_id, BlockIdReference):
+            self._block_id.unregister()
+            del self._block_id
+        if v and self.forest:
+            v = BlockIdReference(self, v)
+        self._block_id = v
+
+
+class LoadedTreeNode(BlockIdReferrerMixin, DirtyMixin, btree.TreeNode):
 
     # 'pickler' is used to en/decode references to this object within
     # other nodes closer to the root of the tree.
@@ -165,7 +208,7 @@ class LoadedTreeNode(DirtyMixin, btree.TreeNode):
         _debug('unloaded %s', self)
 
 
-class NamedLeafNode(DataMixin, btree.LeafNode):
+class NamedLeafNode(BlockIdReferrerMixin, DataMixin, btree.LeafNode):
     pickler = CBORPickler(dict(name=0x21,
                                block_id=0x22,  # tree / data node
                                block_data=0x23,  # raw data without subtree
@@ -280,7 +323,7 @@ class FileBlockTreeNode(LoadedTreeNode):
     entry_type = const.TYPE_FILENODE
 
 
-class FileData(DirtyMixin):
+class FileData(DirtyMixin, BlockIdReferrerMixin):
     entry_type = const.TYPE_FILEDATA
     block_data = None
 
