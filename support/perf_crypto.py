@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 09:10:49 2016 mstenber
-# Last modified: Wed Jun 29 11:30:59 2016 mstenber
-# Edit time:     43 min
+# Last modified: Sat Dec 24 17:01:02 2016 mstenber
+# Edit time:     52 min
 #
 """Test performance of various things related to confidentiality and
 authentication.
@@ -51,19 +51,18 @@ cryptography is like magic..
 
 """
 
-import mmh3  # pip install murmurhash3
-import ms.perf
+import base64
+import hashlib
 import os
 
 from cryptography.fernet import Fernet  # pip install cryptography
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import cmac, hashes, padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-import base64
-from cryptography.hazmat.primitives import padding
 
-import hashlib
+import mmh3  # pip install murmurhash3
+import ms.perf
 
 text10 = b'1234567890'
 text100k = text10 * 10000
@@ -123,6 +122,17 @@ cipher_gcm = Cipher(algorithms.AES(rawkey), modes.GCM(iv),
                     backend=_default_backend)
 
 
+aes_cmac = cmac.CMAC(algorithms.AES(rawkey), backend=_default_backend)
+assert len(rawkey) == 32
+
+
+def test_aes_cmac(s):
+    c = aes_cmac.copy()
+    c.update(s)
+    d = c.finalize()
+    assert len(d) == 16
+
+
 def test_aes_gcm(s):
     encryptor = cipher_gcm.encryptor()
     r = encryptor.update(s) + encryptor.finalize()
@@ -143,6 +153,7 @@ def test_fernet(s):
 l = []
 for (label, fun) in [('mmh3', test_mmh),
                      ('aes', test_aes),
+                     ('aes cmac', test_aes_cmac),
                      ('aes gcm', test_aes_gcm),
                      ('aes gcm full', test_aes_gcm_full),
                      ('sha 256', test_sha256),
