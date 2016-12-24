@@ -6,8 +6,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Nov 19 10:48:22 2016 mstenber
-# Last modified: Sat Dec 24 06:32:27 2016 mstenber
-# Edit time:     28 min
+# Last modified: Sat Dec 24 12:43:16 2016 mstenber
+# Edit time:     36 min
 #
 #
 
@@ -42,7 +42,7 @@ log.txt: .done.requirements $(wildcard *.py)
 profile: .done.profile
 
 pstats: profile
-	python3 -c 'import pstats;pstats.Stats("profile").sort_stats("cumtime").print_stats(100)' | egrep -v '/(Cellar|site-packages)/' | egrep -v '(<frozen|{built-in)'
+	python3 -c 'import pstats;pstats.Stats(".done.profile").sort_stats("cumtime").print_stats(100)' | egrep -v '/(Cellar|site-packages)/' | egrep -v '(<frozen|{built-in)'
 
 .done.profile: .done.requirements $(wildcard *.py)
 	python3 -m cProfile -o .done.profile.new `which py.test`
