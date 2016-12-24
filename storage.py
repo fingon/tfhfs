@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Tue Dec 20 17:48:19 2016 mstenber
-# Edit time:     612 min
+# Last modified: Sat Dec 24 12:14:16 2016 mstenber
+# Edit time:     624 min
 #
 """This is the 'storage layer' main module.
 
@@ -189,6 +189,9 @@ class StorageBackend:
         The given block MUST exist."""
         raise NotImplementedError
 
+    def flush_done(self):
+        pass
+
     def get_block_by_id(self, block_id, *, cleanup=False):
         """Get data for the block identified by block_id.
 
@@ -313,6 +316,9 @@ class SQLiteStorageBackend(StorageBackend):
         self._get_execute_result(
             'DELETE FROM blocks WHERE id=?', (block_id,))
 
+    def flush_done(self):
+        self.conn.commit()
+
     def get_block_by_id(self, block_id, *, cleanup=False):
         _debug('get_block_by_id %s', block_id)
         r = self._get_execute_result(
@@ -433,7 +439,7 @@ class Storage:
     def delete_block_id_be(self, block_id):
         self.backend.delete_block_id(block_id)
 
-    def flush(self):
+    def flush(self, *, skip_storage_flush=False):
         """ Attempt to get rid of dangling reference count 0 blocks. """
         while self.referenced_refcnt0_block_ids:
             s = self.referenced_refcnt0_block_ids
@@ -448,6 +454,8 @@ class Storage:
                         deleted = True
             if not deleted:
                 return
+        if not skip_storage_flush:
+            self.backend.flush_done()
 
     def get_block_data_references(self, block_data):
         yield from self.block_data_references_callback(block_data)
@@ -652,7 +660,9 @@ class DelayedStorage(Storage):
 
     def flush(self):
         _debug('flush')
-        Storage.flush(self)  # do repeat delete attempts first
+        Storage.flush(self, skip_storage_flush=True)
+        # do repeat delete attempts first
+
         ops = 0
         while True:
             dirty_blocks, self._dirty_blocks = self._dirty_blocks, {}
@@ -669,6 +679,8 @@ class DelayedStorage(Storage):
         for block_id, o in list(self._blocks.items()):
             if not o.data_refcnt[1] and not self.block_id_has_references_callback(block_id):
                 self._delete_cached_block_id(block_id)
+
+        self.backend.flush_done()
         return ops
 
     def get_block_by_id(self, block_id, *, cleanup=False):
