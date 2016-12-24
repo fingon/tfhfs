@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Sat Dec 24 11:35:47 2016 mstenber
-# Edit time:     276 min
+# Last modified: Sat Dec 24 11:50:28 2016 mstenber
+# Edit time:     285 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -213,14 +213,15 @@ class FileINode(inode.INode):
             self.set_size(nsize, minimum_size=ofs)
         done = 0
         while done < len(buf):
-            wrote = self._write(ofs + done, buf[done:])
+            wrote = self._write(ofs + done, buf, done)
             done += wrote
         _debug('wrote %d total to %d', done, ofs)
         self.changed()
         return done
 
-    def _write(self, ofs, buf):
-        _debug('_write @%d %s', ofs, len(buf))
+    def _write(self, ofs, buf, bufofs=0):
+        _debug('_write @%d %s(%d+)', ofs, len(buf), bufofs)
+        obufofs = bufofs
         size = len(buf)
 
         def _replace(s, ofs, buf, bufofs, bufmax):
@@ -241,15 +242,15 @@ class FileINode(inode.INode):
         ln = self.leaf_node
         n = self.load_node()
         if n is None:
-            s, bufofs = _replace(ln.block_data, ofs, buf, 0, 0)
+            s, bufofs = _replace(ln.block_data, ofs, buf, bufofs, 0)
             ln.set_block_data(s)
         elif isinstance(n, FileData):
-            s, bufofs = _replace(n.content, ofs, buf, 0, 0)
+            s, bufofs = _replace(n.content, ofs, buf, bufofs, 0)
             self.set_node(FileData(self.forest, None, s))
         else:
             _debug(' tree @%d %d', ofs, size)
             cn, k, d, ofs = self._tree_node_key_data_for_ofs(ofs, size)
-            s, bufofs = _replace(d, ofs, buf, 0,
+            s, bufofs = _replace(d, ofs, buf, bufofs,
                                  min(size, const.BLOCK_SIZE_LIMIT - ofs))
             # If the child node does not exist, create it and add to tree
             if not cn:
@@ -258,8 +259,9 @@ class FileINode(inode.INode):
             bid = self.forest.refer_or_store_block_by_data(s)
             cn.set_block_id(bid)
             self.forest.storage.release_block(bid)
-        _debug(' = %d bytes written (result len %d)', bufofs, len(s))
-        return bufofs
+        wrote = bufofs - obufofs
+        _debug(' = %d bytes written (result len %d)', wrote, len(s))
+        return wrote
 
     def _to_block_tree(self, size, minimum_size=None):
         _debug('_to_block_tree %d (%s)', size, minimum_size)
