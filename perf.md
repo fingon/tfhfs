@@ -34,7 +34,21 @@ time ( find /tmp/x -type f | xargs cat > /dev/null )
 
 ## current git commit
 
+### in-memory, no compression
+
 (test#3) 77MB/s write (10MB blocksize)
+
+### disk SQLite, no compression
+
+#### write
+
+(test#3) 41MB/s write (10MB blocksize)
+
+#### read
+
+(test#3) 1st: 63s (~100MB/s)
+(test#3) 2nd: 1.5s (~4GB/s)
+
 
 ## git commit ~4ac41780c8a14b4f796832327b94d0c7b111af7e
 
