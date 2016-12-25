@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Sat Dec 24 11:56:42 2016 mstenber
-# Edit time:     185 min
+# Last modified: Sun Dec 25 07:59:29 2016 mstenber
+# Edit time:     195 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -313,6 +313,7 @@ def test_huge_file(order):
             const.INTERNED_BLOCK_DATA_SIZE_LIMIT - 7)
 
 if __name__ == '__main__':
+    import subprocess
     # TBD - argument parsing?
     import argparse
     p = argparse.ArgumentParser(
@@ -373,19 +374,27 @@ if __name__ == '__main__':
     if args.debug:
         fuse_options.add('debug')
     llfuse.init(ops, args.mountpoint, fuse_options)
-    tl = [None]
+    tl = [None, True]
     import threading
 
+    is_closed = False
+
     def _run_flush_timer():
+        if not tl[1]:
+            return
         with llfuse.lock:
             ops.forest.flush()
         tl[0] = threading.Timer(args.interval, _run_flush_timer)
         tl[0].start()
     _run_flush_timer()
     try:
-        llfuse.main(workers=args.workers)
-    except:
-        llfuse.close(unmount=False)
-        raise
-    llfuse.close()
-    tl[0].cancel()
+        sig = llfuse.main(workers=args.workers)
+        tl[1] = False  # Even if the timer fires now, it should be nop
+        if sig is None:
+            llfuse.close()
+            is_closed = True
+    finally:
+        if not is_closed:
+            llfuse.close(unmount=False)
+            subprocess.call(['umount', args.mountpoint])
+        tl[0].cancel()
