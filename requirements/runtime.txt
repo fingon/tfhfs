@@ -1,2 +1,6 @@
 llfuse
 psutil
+murmurhash3
+cbor
+cryptography
+lz4
