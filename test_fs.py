@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # -*- Python -*-
 #
@@ -9,14 +9,15 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Sun Dec 25 07:59:29 2016 mstenber
-# Edit time:     195 min
+# Last modified: Sun Dec 25 08:10:38 2016 mstenber
+# Edit time:     198 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
 
 """
 
+import argparse
 import contextlib
 import errno
 import itertools
@@ -312,10 +313,8 @@ def test_huge_file(order):
         _truncate_and_ensure_start_sane(
             const.INTERNED_BLOCK_DATA_SIZE_LIMIT - 7)
 
-if __name__ == '__main__':
-    import subprocess
-    # TBD - argument parsing?
-    import argparse
+
+def argument_parser():
     p = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     p.add_argument('--cache-size', type=int, default=1024**3,
@@ -338,6 +337,12 @@ if __name__ == '__main__':
         help='Program to get the password from for encryption')
     p.add_argument('--workers', '-w',
                    default=1, type=int, help='number of threads to use')
+    return p
+
+if __name__ == '__main__':
+    import subprocess
+    # TBD - argument parsing?
+    p = argument_parser()
     args = p.parse_args()
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)

@@ -6,8 +6,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Nov 19 10:48:22 2016 mstenber
-# Last modified: Sat Dec 24 12:43:16 2016 mstenber
-# Edit time:     36 min
+# Last modified: Sun Dec 25 09:30:23 2016 mstenber
+# Edit time:     38 min
 #
 #
 
@@ -41,13 +41,22 @@ log.txt: .done.requirements $(wildcard *.py)
 
 profile: .done.profile
 
+perf.md: .done.perf
+	cp .done.perf $@
+
 pstats: profile
 	python3 -c 'import pstats;pstats.Stats(".done.profile").sort_stats("cumtime").print_stats(100)' | egrep -v '/(Cellar|site-packages)/' | egrep -v '(<frozen|{built-in)'
 
+.done.perf: $(wildcard *.py)
+	support/perf_fs.py | tee $@.new
+	mv $@.new $@
+
 .done.profile: .done.requirements $(wildcard *.py)
-	python3 -m cProfile -o .done.profile.new `which py.test`
-	mv .done.profile.new .done.profile
+	python3 -m cProfile -o $@.new `which py.test`
+	mv $@.new $@
 
 .done.requirements: requirements/*.txt
-	pip3 install --upgrade $(PIP_TO_USER) -c requirements/constraints.txt -r requirements/runtime.txt -r requirements/development.txt
+	pip3 install --upgrade $(PIP_TO_USER) \
+		-c requirements/constraints.txt -r requirements/runtime.txt \
+		-r requirements/development.txt
 	touch $@

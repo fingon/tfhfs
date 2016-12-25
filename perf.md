@@ -1,102 +1,63 @@
-Hardware: 2013 Mac Pro, enough RAM, fast enough SSD
+# In-memory dict
+## Write 5800 megabytes
+Command: dd "if=/Users/mstenber/software/mac/10-11-elcapitan/Install OS X El Capitan.app/Contents/SharedSupport/InstallESD.dmg" of=/tmp/x/foo.dat bs=1024000
 
-# Test #1
+Took 46.79194498062134 seconds
+123.0 megabytes per second
 
-Test dataset: 1626MB of text files (~4500)
+## Write 52122 files
+Command: rsync -a /Users/mstenber/share/1/Maildir/.Junk /tmp/x/
 
-## write
+Took 130.3254199028015 seconds
+399.0 files per second
 
-time rsync -av ~/bat/logs /tmp/x/
+# SQLite compressed+encrypted
+## Write 5800 megabytes
+Command: dd "if=/Users/mstenber/software/mac/10-11-elcapitan/Install OS X El Capitan.app/Contents/SharedSupport/InstallESD.dmg" of=/tmp/x/foo.dat bs=1024000
 
-# Test #2
+Took 135.78562188148499 seconds
+42.0 megabytes per second
 
-Test dataset: OS X El Capitan images, 6GB?
+## Read it back
+Command: find /tmp/x -type f | xargs cat > /dev/null
 
-## write
+Took 57.14152407646179 seconds
+101.0 megabytes per second
 
-time rsync -av /Users/mstenber/software/mac/10-11-elcapitan /tmp/x/
+## Write 52122 files
+Command: rsync -a /Users/mstenber/share/1/Maildir/.Junk /tmp/x/
 
-# Test #3
+Took 166.1662232875824 seconds
+313.0 files per second
 
-Just El Capitan .dmg, 6GB-ish, no rsync, but dd instead
+## Read it back
+Command: find /tmp/x -type f | xargs cat > /dev/null
 
-## write
+Took 125.61733675003052 seconds
+414.0 files per second
 
-time dd if=/Users/mstenber/software/mac/10-11-elcapitan/Install\ OS\ X\ El\ Capitan.app/Contents/SharedSupport/InstallESD.dmg of=/tmp/x/foo.dat bs=1024000
+# SQLite encrypted
+## Write 5800 megabytes
+Command: dd "if=/Users/mstenber/software/mac/10-11-elcapitan/Install OS X El Capitan.app/Contents/SharedSupport/InstallESD.dmg" of=/tmp/x/foo.dat bs=1024000
 
-# read step for all tests
+Took 134.98714113235474 seconds
+42.0 megabytes per second
 
-- fresh mount /tmp/x
+## Read it back
+Command: find /tmp/x -type f | xargs cat > /dev/null
 
-time ( find /tmp/x -type f | xargs cat > /dev/null )
+Took 53.88020586967468 seconds
+107.0 megabytes per second
 
-# 24.12.2016
+## Write 52122 files
+Command: rsync -a /Users/mstenber/share/1/Maildir/.Junk /tmp/x/
 
-## git commit HEAD
+Took 178.03736996650696 seconds
+292.0 files per second
 
-### in-memory, no compression
+## Read it back
+Command: find /tmp/x -type f | xargs cat > /dev/null
 
-(test#3) ~150MB/s write (10MB blocksize)
+Took 125.01372694969177 seconds
+416.0 files per second
 
-## git commit <= 0afebfdd8e97fe913cb486ac8f3a14620ff96317
-
-### in-memory, no compression
-
-(test#3) 77MB/s write (10MB blocksize)
-
-### disk SQLite, no compression
-
-#### write
-
-(test#3) 41MB/s write (10MB blocksize)
-
-#### read
-
-(test#3) 1st: 63s (~100MB/s)
-(test#3) 2nd: 1.5s (~4GB/s)
-
-
-## git commit ~4ac41780c8a14b4f796832327b94d0c7b111af7e
-
-### NO WRITE CODE AT ALL (testing cost of fuse + calling llfuse ops)
-
-(test#2) 70MB/s write
-(test#3) 103 MB/s write (1MB blocksize)
-(test#3) 348MB/s write (10MB blocksize)
-(test#3) 351MB/s write (100MB blocksize)
-
-### in-memory, no compression
-
-(test#1) 40MB/s write (20% of time spent in SHA256)
-(test#1) 42MB/s write (no profiling)
-(test#2) 56MB/s write (no profiling)
-(test#3) 76MB/s write (10MB blocksize)
-
-## git commit 602f3a069332446ed6bfee13dbbfdcf27edf82ed
-
-### in-memory, no compression
-
-(test#1) ~23MB/s write
-
-### disk SQLite, no compression
-
-#### write
-
-(test#1) 17MB/s
-
-#### read
-
-(test#1) 1st: 10.7s (= 150MB/s)
-(test#1) 2nd: 1.67s (= 1G/s)
-
-
-### disk SQLite, compression
-
-#### write
-
-(test#1) 17.5MB/s
-
-#### read
-
-(test#1) 1st: 11s (=~ 150MB/s)
-(test#1) 2nd: 1.75s (= 1GB/s)
