@@ -10,3 +10,6 @@ pytest-ordering
 pytest-profiling
 pytest-cache
 # ^ -lf
+
+coverage
+# ^ nice to have
