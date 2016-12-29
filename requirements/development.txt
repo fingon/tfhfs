@@ -13,3 +13,4 @@ pytest-cache
 
 coverage
 # ^ nice to have
+pytest-cov

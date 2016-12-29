@@ -6,18 +6,22 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Nov 19 10:48:22 2016 mstenber
-# Last modified: Sun Dec 25 09:30:23 2016 mstenber
-# Edit time:     38 min
+# Last modified: Thu Dec 29 21:03:13 2016 mstenber
+# Edit time:     45 min
 #
 #
+
 
 # Utility to get number of cores; I am not sure I really want to run
 # anything else than OS X or Linux anyway.
 ifeq ($(shell uname),Darwin)
-	CORE_COUNT=`sysctl machdep.cpu.core_count | cut -d ':' -f 2`
+       CORE_COUNT=`sysctl machdep.cpu.core_count | cut -d ':' -f 2`
+# ^ core_count is real cores, and not hyperthreads -> faster with fewer, yay.
 else
-	CORE_COUNT=`nproc`
+       CORE_COUNT=auto
 endif
+
+ # Set this to blank if you want
 
 # Set this to blank if you want pip requirements to non-user ones
 # (I CBA with venv for this for now)
@@ -33,11 +37,16 @@ clean:
 # --strict = warning = error
 # -o xfail_strict=True = xpass = fail as well
 
+PYTEST_ARGS=--strict -o xfail_strict=True -n $(CORE_COUNT)
+
 test: .done.requirements
-	py.test --no-print-logs --strict -rx -rw -o xfail_strict=True -n $(CORE_COUNT)
+	py.test --no-print-logs -rx -rw $(PYTEST_ARGS)
+
+cov: .done.coverage
+	open htmlcov/index.html
 
 log.txt: .done.requirements $(wildcard *.py)
-	py.test -p no:sugar --strict -rx -rw -o xfail_strict=True -n $(CORE_COUNT) 2>&1 | tee log.txt
+	py.test -p no:sugar  $(PYTEST_ARGS) -rx -rw 2>&1 | tee log.txt
 
 profile: .done.profile
 
@@ -46,6 +55,11 @@ perf.md: .done.perf
 
 pstats: profile
 	python3 -c 'import pstats;pstats.Stats(".done.profile").sort_stats("cumtime").print_stats(100)' | egrep -v '/(Cellar|site-packages)/' | egrep -v '(<frozen|{built-in)'
+
+.done.coverage: $(wildcard *.py)
+	rm -rf htmlcov
+	py.test --cov-report=html --cov=. $(PYTEST_ARGS)
+	touch $@
 
 .done.perf: $(wildcard *.py)
 	support/perf_fs.py | tee $@.new
