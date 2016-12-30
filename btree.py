@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 15:36:58 2016 mstenber
-# Last modified: Fri Dec 30 09:16:03 2016 mstenber
-# Edit time:     320 min
+# Last modified: Fri Dec 30 16:45:32 2016 mstenber
+# Edit time:     323 min
 #
 """This is the 'btree' module.
 
@@ -109,19 +109,20 @@ node. """
             self.mark_dirty()
         return idx
 
-    def _pop_child(self, idx):
+    def _pop_child(self, idx, **kw):
         c = self.children[idx]
-        self.remove_child_nocheck(c, idx=idx)
+        self.remove_child_nocheck(c, idx=idx, **kw)
         return c
 
-    def remove_child_nocheck(self, c, *, idx=None):
+    def remove_child_nocheck(self, c, *, idx=None, skip_dirty=False):
         assert isinstance(c, Node)
         self.csize -= c.size
         if idx is None:
             idx = self.child_keys.index(c.key)
         del self.children[idx]
         del self.child_keys[idx]
-        self.mark_dirty()
+        if not skip_dirty:
+            self.mark_dirty()
 
     def _update_key_maybe(self, *, force=False):
         nk = self.child_keys[0]
@@ -143,17 +144,22 @@ node. """
         _debug(' too big, splitting')
         tn = self.create()
         while self.csize > tn.csize:
-            tn.add_child_nocheck(self._pop_child(-1), idx=0)
+            tn.add_child_nocheck(self._pop_child(-1, skip_dirty=True),
+                                 idx=0, skip_dirty=True)
         tn.key = tn.child_keys[0]
         if self.parent is not None:
             self.parent.add_child(tn)
+            tn.mark_dirty()
             return
         tn2 = self.create()
         while self.children:
-            tn2.add_child_nocheck(self._pop_child(-1), idx=0)
+            tn2.add_child_nocheck(self._pop_child(-1, skip_dirty=True),
+                                  idx=0, skip_dirty=True)
         tn2.key = tn2.child_keys[0]
         self.add_child_nocheck(tn2, idx=0)
         self.add_child_nocheck(tn, idx=1)
+        tn.mark_dirty()
+        tn2.mark_dirty()
 
     def add_to_tree(self, c):
         _debug('adding %s to %s', c, self)

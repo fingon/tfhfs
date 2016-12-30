@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Fri Dec 30 15:34:39 2016 mstenber
-# Edit time:     459 min
+# Last modified: Fri Dec 30 16:41:28 2016 mstenber
+# Edit time:     461 min
 #
 """
 
@@ -219,7 +219,8 @@ class Operations(llfuse.Operations):
             fd = file_inode.open(flags)
             file_inode.change_mtime()
         except:
-            file_inode.deref()
+            if file_inode:
+                file_inode.deref()
             raise
         # We can return it and increment the refcnt implicitly (done
         # in lookup/create_file)
