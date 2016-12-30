@@ -63,3 +63,4 @@ target/
 .done.*
 
 log.txt
+.#*
