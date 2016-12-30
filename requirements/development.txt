@@ -1,3 +1,5 @@
+autopep8
+
 pytest
 pytest-catchlog
 # ^ nice to have debug output etc available

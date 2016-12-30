@@ -6,8 +6,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Nov 19 10:48:22 2016 mstenber
-# Last modified: Thu Dec 29 21:03:13 2016 mstenber
-# Edit time:     45 min
+# Last modified: Fri Dec 30 15:50:35 2016 mstenber
+# Edit time:     46 min
 #
 #
 
@@ -27,7 +27,7 @@ endif
 # (I CBA with venv for this for now)
 PIP_TO_USER=--user
 
-all: test
+all: test autopep8
 
 clean:
 	rm -f .done.*
@@ -38,6 +38,8 @@ clean:
 # -o xfail_strict=True = xpass = fail as well
 
 PYTEST_ARGS=--strict -o xfail_strict=True -n $(CORE_COUNT)
+
+autopep8: .done.autopep8
 
 test: .done.requirements
 	py.test --no-print-logs -rx -rw $(PYTEST_ARGS)
@@ -73,4 +75,9 @@ pstats: profile
 	pip3 install --upgrade $(PIP_TO_USER) \
 		-c requirements/constraints.txt -r requirements/runtime.txt \
 		-r requirements/development.txt
+	touch $@
+
+
+.done.autopep8: $(wildcard *.py)
+	autopep8 --in-place *.py
 	touch $@
