@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Sun Dec 25 08:10:38 2016 mstenber
-# Edit time:     198 min
+# Last modified: Fri Dec 30 08:45:57 2016 mstenber
+# Edit time:     202 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -271,7 +271,7 @@ def test_unlink_behavior():
 @pytest.mark.parametrize('order', list(itertools.permutations((0, 1, 2))))
 def test_huge_file(order):
     """ Test that a HUGE(tm) file reads out all zeroes (and this will not end in tears) """
-    hugefilesize = 1e12 + 42  # 1 terabyte
+    hugefilesize = int(1e18) + 42  # 1 exabyte
     middlish = hugefilesize // 2 + 13
     mfs = MockFS()
     with mfs.open('file', 'wb') as f:
@@ -376,6 +376,7 @@ if __name__ == '__main__':
     fuse_options.add('slow_statfs')
     # fuse_options.add('novncache') # this works but what does it do?
     # fuse_options.add('noattrcache')  # this works but what does it do?
+    fuse_options.add('allow_root')
     if args.debug:
         fuse_options.add('debug')
     llfuse.init(ops, args.mountpoint, fuse_options)
