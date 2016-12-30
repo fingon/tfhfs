@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Fri Dec 30 14:23:09 2016 mstenber
-# Edit time:     441 min
+# Last modified: Fri Dec 30 14:44:34 2016 mstenber
+# Edit time:     445 min
 #
 """
 
@@ -214,6 +214,7 @@ class Operations(llfuse.Operations):
             else:
                 file_inode = self.forest.create_file(pn, name, mode=mode)
                 self._set_de_perms_from_ctx(file_inode.direntry, ctx)
+                pn.changed2()
             fd = file_inode.open(flags)
             file_inode.changed_mtime()
         except:
