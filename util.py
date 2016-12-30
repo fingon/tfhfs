@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:06:01 2016 mstenber
-# Last modified: Sat Dec 24 09:02:45 2016 mstenber
-# Edit time:     61 min
+# Last modified: Fri Dec 30 12:56:50 2016 mstenber
+# Edit time:     62 min
 #
 """
 
@@ -162,15 +162,19 @@ class DataMixin(DirtyMixin):
     def nonempty_data(self):
         return {k: v for k, v in self.data.items() if v}
 
-    def set_data(self, k, v):
-        assert (not self.cbor_data_pickler
-                or k in self.cbor_data_pickler.internal2external_dict)
+    def set_data_nodirty(self, k, v):
         data = self.data
         if data.get(k) == v:
             _debug('%s redundant set_data %s=%s', self, k, v)
             return
         data[k] = v
-        self.mark_dirty()
+        return True
+
+    def set_data(self, k, v):
+        assert (not self.cbor_data_pickler
+                or k in self.cbor_data_pickler.internal2external_dict)
+        if self.set_data_nodirty(k, v):
+            self.mark_dirty()
 
     cbor_data_pickler = None
 

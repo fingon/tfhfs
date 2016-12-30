@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Mon Dec 26 11:05:26 2016 mstenber
-# Edit time:     134 min
+# Last modified: Fri Dec 30 13:20:25 2016 mstenber
+# Edit time:     135 min
 #
 """
 
@@ -159,8 +159,10 @@ class LoadedTreeNode(BlockIdReferrerMixin, DirtyMixin, btree.TreeNode):
 
     def mark_dirty_related(self):
         super(LoadedTreeNode, self).mark_dirty_related()
-        if self.parent is None:
-            self.forest.dirty_node_set.add(self)
+        if self.parent is not None:
+            return
+        self.forest.dirty_node_set.add(self)
+        self.forest.inodes.get_by_node(self)  # debug check
 
     def perform_flush(self):
         if not self.is_loaded:
@@ -240,7 +242,7 @@ class NamedLeafNode(BlockIdReferrerMixin, DataMixin, btree.LeafNode):
                                   # ^ WeakRefEntry
                                   foo=0x42,
                                   # ^ test only
-    )
+                                  )
     for v, k in enumerate(const.ATTR_STAT_KEYS, 0x50):
         cbor_data_pickler_dict[k] = v
     # ^ DirEntry st_* are 0x50+
@@ -310,6 +312,10 @@ class DirectoryEntry(NamedLeafNode):
         mtime = self.data.get('st_mtime_ns', 0)
         o_mtime = o.data.get('st_mtime_ns', 0)
         return mtime > o_mtime
+
+    @property
+    def is_sticky(self):
+        return self.mode & stat.S_ISVTX
 
     @property
     def mode(self):
@@ -387,8 +393,10 @@ class FileData(DirtyMixin, BlockIdReferrerMixin):
     def unload_if_possible(self, protected_set):
         pass
 
+
 class WeakRefEntry(NamedLeafNode):
     name_hash_size = 0
+
 
 class WeakRefNode(LoadedTreeNode):
     leaf_class = WeakRefEntry
@@ -398,6 +406,7 @@ _type_to_loaded_tree_node_subclass = {}
 
 for cl in LoadedTreeNode.__subclasses__():
     _type_to_loaded_tree_node_subclass[cl.entry_type] = cl
+
 
 def any_node_block_data_references_callback(block_data, *, ignore_weak=False):
     (rt, d) = block_data

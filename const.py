@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jul  2 21:10:04 2016 mstenber
-# Last modified: Mon Dec 26 10:19:34 2016 mstenber
+# Last modified: Fri Dec 30 12:55:35 2016 mstenber
 # Edit time:     20 min
 #
 """
@@ -49,7 +49,7 @@ BLOCK_SIZE_LIMIT = 128000
 
 # llfuse.EntryAttributes reflection stuff
 ATTR_STAT_KEYS = ['st_atime_ns',
-                  # ^ not provided by us
+                  # ^ _lazily_ provided by us (only updated on related writes)
                   'st_blksize',
                   # ^ efficient block size (Linuxism?)
                   'st_blocks',

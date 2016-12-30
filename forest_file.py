@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Fri Dec 30 08:41:58 2016 mstenber
-# Edit time:     339 min
+# Last modified: Fri Dec 30 10:14:12 2016 mstenber
+# Edit time:     340 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -52,7 +52,8 @@ from forest_nodes import FileBlockEntry, FileBlockTreeNode, FileData
 
 _debug = logging.getLogger(__name__).debug
 
-KEY_STRUCT_FORMAT='>Q' # 64 bit long long
+KEY_STRUCT_FORMAT = '>Q'  # 64 bit long long
+
 
 class FileDescriptor:
     inode = None
@@ -265,7 +266,7 @@ class FileINode(util.DirtyMixin, inode.INode):
             wrote = self._write(ofs + done, buf, done)
             done += wrote
         _debug('wrote %d total to %d', done, ofs)
-        self.changed()
+        self.changed_mtime()
         return done
 
     def _write(self, ofs, buf, bufofs=0):

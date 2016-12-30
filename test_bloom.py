@@ -19,12 +19,15 @@
 from bloom import IntArrayBloom, BigIntBloom
 import pytest
 
+
 @pytest.fixture(params=['array', 'bigint'])
 def bloom_class(request):
     return {'array': IntArrayBloom, 'bigint': BigIntBloom}[request.param]
 
+
 def _nophasher(v):
     yield v
+
 
 def test_bloom(bloom_class):
     b = bloom_class(_nophasher, n=10)
@@ -46,6 +49,7 @@ def test_bloom(bloom_class):
     assert nb is not b
     assert nb.has(7)
     assert not nb.has(8)
+
 
 def test_bloom_huge(bloom_class):
     b = bloom_class(_nophasher, n=10)

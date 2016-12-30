@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Jul  5 11:49:58 2016 mstenber
-# Last modified: Tue Dec 20 18:18:23 2016 mstenber
+# Last modified: Fri Dec 30 13:02:01 2016 mstenber
 # Edit time:     97 min
 #
 """
@@ -61,6 +61,7 @@ def testforest():
     assert f2c is f2c2
     assert f2c
     d = f2c.leaf_node.nonempty_data
+    del d['st_atime_ns']
     del d['st_ctime_ns']
     del d['st_mtime_ns']
     assert d == dict(foo=42, st_mode=stat.S_IFREG)

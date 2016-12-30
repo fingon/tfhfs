@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Thu Dec 29 22:27:24 2016 mstenber
-# Edit time:     68 min
+# Last modified: Fri Dec 30 12:58:33 2016 mstenber
+# Edit time:     80 min
 #
 """
 
@@ -98,6 +98,7 @@ class INodeAllocator(Allocator):
         if n:
             assert n not in self.node2inode
             self.node2inode[n] = inode
+        _debug('INode id%s _inode_node_changed %s => %s', id(inode), old_n, n)
 
     def register(self, inode):
         Allocator.register(self, inode)
@@ -137,11 +138,32 @@ class INode:
         _debug('%s added', self)
 
     def __repr__(self):
-        return '<INode #%d - n:%s ln:%s>' % (self.value, self.node, self.leaf_node)
+        return '<INode id%s #%d - n:%s ln:%s>' % (id(self), self.value,
+                                                  self.node, self.leaf_node)
 
-    def changed(self):
-        if self.leaf_node or (self.node and isinstance(self.node, TreeNode)):
-            self.direntry.set_data('st_mtime_ns', int(time.time() * 1e9))
+    def changed2(self, ctime=True, mtime=True):
+        if not self.leaf_node and not (self.node and isinstance(self.node, TreeNode)):
+            return
+        t = int(time.time() * 1e9)
+        de = self.direntry
+        if ctime:
+            de.set_data('st_ctime_ns', t)
+        if mtime:
+            de.set_data('st_mtime_ns', t)
+        _debug('%s changed %s', self,
+               (ctime and mtime and "ctime+mtime")
+               or (ctime and "ctime" or "mtime"))
+        self.changed_atime()
+
+    def changed_atime(self):
+        t = int(time.time() * 1e9)
+        self.direntry.set_data('st_atime_ns', t)
+
+    def changed_ctime(self):
+        self.changed2(mtime=False)
+
+    def changed_mtime(self):
+        self.changed2(ctime=False)
 
     def deref(self, count=1):
         assert count > 0

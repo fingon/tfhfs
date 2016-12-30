@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 15:36:58 2016 mstenber
-# Last modified: Thu Dec 29 22:25:40 2016 mstenber
-# Edit time:     319 min
+# Last modified: Fri Dec 30 09:16:03 2016 mstenber
+# Edit time:     320 min
 #
 """This is the 'btree' module.
 
@@ -88,8 +88,12 @@ node. """
         self.key = None
 
     def __repr__(self):
-        return '<%s >=%s - depth %d>' % (self.__class__.__name__,
-                                         self.key, self.depth)
+        keystring = ''
+        if self.key is not None:
+            keystring = '>= %s ' % self.key
+        return '<%s id%s %s- depth %d>' % (self.__class__.__name__,
+                                           id(self),
+                                           keystring, self.depth)
 
     def add_child_nocheck(self, c, *, skip_dirty=False, idx=None):
         assert isinstance(c, Node)

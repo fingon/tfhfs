@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Fri Dec 30 10:50:19 2016 mstenber
-# Edit time:     206 min
+# Last modified: Fri Dec 30 13:07:03 2016 mstenber
+# Edit time:     209 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -23,7 +23,7 @@ import errno
 import itertools
 import logging
 import os
-
+from ms.lazy import lazy_property
 import pytest
 
 import const
@@ -401,6 +401,9 @@ if __name__ == '__main__':
             is_closed = True
     finally:
         if not is_closed:
+            _debug('closing llfuse')
             llfuse.close(unmount=False)
+            _debug('umount mountpoint (just in case)')
             subprocess.call(['umount', args.mountpoint])
+        _debug('cancel flush timer')
         tl[0].cancel()

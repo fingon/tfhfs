@@ -8,9 +8,11 @@ given
 
 # ( cd /tmp/x && prove5.18 -f -o -r ~mstenber/git/fstest/tests ) 2>&1 | tee log.txt ; umount /tmp/x
 
-egrep '^not ok' ~/log.txt | wc
-     619    1857    6126
+before this project started:
 
+egrep '^not ok' ~/log.txt | wc -l = 619
+
+now: 87
 
 ** Write more thorough filesystem tests to test_ops or elsewhere
 
@@ -103,3 +105,7 @@ multiple writers are present, no cleanups.
 
 Electing the cleaner to be the one with most in-memory references seems
 sensible but possibly minor optimization.
+
+** Real supplementary group support
+
+*** (For now, we parse pwd/grp, which, while nice, is not correct)

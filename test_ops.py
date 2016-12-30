@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Aug 17 10:39:05 2016 mstenber
-# Last modified: Sat Dec 24 07:17:24 2016 mstenber
-# Edit time:     206 min
+# Last modified: Fri Dec 30 13:38:39 2016 mstenber
+# Edit time:     211 min
 #
 """
 
@@ -203,11 +203,12 @@ def test_symlink(oc):
 
 
 def test_symlink_over_nonowned_err(oc):
-    target = b'/user_file'
+    name = b'user_file'
+    points_at = b'/root_file'
     with pytest.raises(llfuse.FUSEError) as e:
-        oc.ops.symlink(llfuse.ROOT_INODE, b'root_file', target, oc.rctx_user)
+        oc.ops.symlink(llfuse.ROOT_INODE, name, points_at, oc.rctx_user)
         assert False
-    assert e.value.errno == errno.EPERM
+    assert e.value.errno == errno.EEXIST
 
 
 def test_rename(oc):

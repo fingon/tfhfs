@@ -118,4 +118,4 @@ class IntArrayBloom(AbstractBloom):
         ofs = v % bpi
         return self.value[idx] & (1 << ofs)
 
-Bloom = IntArrayBloom # marginally faster, it seems
+Bloom = IntArrayBloom  # marginally faster, it seems

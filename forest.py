@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Thu Dec 29 22:28:09 2016 mstenber
-# Edit time:     669 min
+# Last modified: Fri Dec 30 13:40:10 2016 mstenber
+# Edit time:     679 min
 #
 """This is the 'forest layer' main module.
 
@@ -90,6 +90,9 @@ class Forest:
         block_id = self.storage.get_block_id_by_name(self.content_name)
         tn = self.directory_node_class(forest=self, block_id=block_id)
         self.root = self.inodes.add_inode(tn, value=self.root_inode)
+        self.root.direntry.set_data('st_mode', self.root.direntry.mode |
+                                    stat.S_ISVTX)
+        # Root dir is sticky by default
 
     def _create(self, mode, dir_inode, name):
         # Create 'content tree' root node for the new child
@@ -112,22 +115,20 @@ class Forest:
         if node:
             node.mark_dirty()
         leaf.set_data('st_mode', mode)
-        t = int(time.time() * 1e9)
-        leaf.set_data('st_ctime_ns', t)
-        leaf.set_data('st_mtime_ns', t)
+        inode.changed2()
         return inode
 
     def create_dir(self, dir_inode, name, *, mode=0):
         if not stat.S_IFMT(mode):
             mode |= stat.S_IFDIR
-        dir_inode.changed()
+        dir_inode.changed2()
         _debug('create_dir %s 0x%x', name, mode)
         return self._create(mode, dir_inode, name)
 
     def create_file(self, dir_inode, name, *, mode=0):
         if not stat.S_IFMT(mode):
             mode |= stat.S_IFREG
-        dir_inode.changed()
+        dir_inode.changed2()
         _debug('create_file %s 0x%x', name, mode)
         return self._create(mode, dir_inode, name)
 
@@ -150,8 +151,13 @@ class Forest:
         while self.dirty_node_set:
             self.dirty_node_set, dns = set(), self.dirty_node_set
             for node in dns:
-                inode = self.inodes.get_by_node(node.root)
-                if inode.leaf_node:
+                inode = self.inodes.getdefault_by_node(node.root)
+                # ^ getdefault because there are some cases
+                # (e.g. file size changes from single block to tree and
+                # vice versa) where we may have dirty nodes that are not
+                # connected to the tree; they should disappear at the end of
+                # flush
+                if inode and inode.leaf_node:
                     inode.leaf_node.mark_dirty()
 
         if PRINT_DEBUG_FLUSH:
