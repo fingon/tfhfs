@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Sat Dec 24 21:25:22 2016 mstenber
-# Edit time:     119 min
+# Last modified: Mon Dec 26 11:05:26 2016 mstenber
+# Edit time:     134 min
 #
 """
 
@@ -234,11 +234,16 @@ class NamedLeafNode(BlockIdReferrerMixin, DataMixin, btree.LeafNode):
                                _cbor_data=0x24))
 
     # Used to pickle _data
-    cbor_data_pickler_dict = dict(mode=0x31, xattr=0x32, minifile=0x33,
-                                  foo=0x42)
-    # ^ 'foo' is used in tests only, as random metadata
+    cbor_data_pickler_dict = dict(xattr=0x30, minifile=0x31,
+                                  # ^ DirEntry
+                                  access_count=0x32, normal_block_id=0x33,
+                                  # ^ WeakRefEntry
+                                  foo=0x42,
+                                  # ^ test only
+    )
     for v, k in enumerate(const.ATTR_STAT_KEYS, 0x50):
         cbor_data_pickler_dict[k] = v
+    # ^ DirEntry st_* are 0x50+
 
     cbor_data_pickler = CBORPickler(cbor_data_pickler_dict)
 
@@ -382,16 +387,26 @@ class FileData(DirtyMixin, BlockIdReferrerMixin):
     def unload_if_possible(self, protected_set):
         pass
 
+class WeakRefEntry(NamedLeafNode):
+    name_hash_size = 0
 
-def any_node_block_data_references_callback(block_data):
+class WeakRefNode(LoadedTreeNode):
+    leaf_class = WeakRefEntry
+    entry_type = const.TYPE_WEAKREFNODE
+
+_type_to_loaded_tree_node_subclass = {}
+
+for cl in LoadedTreeNode.__subclasses__():
+    _type_to_loaded_tree_node_subclass[cl.entry_type] = cl
+
+def any_node_block_data_references_callback(block_data, *, ignore_weak=False):
     (rt, d) = block_data
+    if rt & const.BIT_WEAK and not ignore_weak:
+        return
     t = rt & const.TYPE_MASK
-
-    if t == const.TYPE_DIRNODE:
-        n = DirectoryTreeNode(None)
-        n.load_from_data(block_data)
-    elif t == const.TYPE_FILENODE:
-        n = FileBlockTreeNode(None)
+    cl = _type_to_loaded_tree_node_subclass.get(t)
+    if cl is not None:
+        n = cl(None)
         n.load_from_data(block_data)
     elif t == const.TYPE_FILEDATA:
         return

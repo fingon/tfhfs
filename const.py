@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jul  2 21:10:04 2016 mstenber
-# Last modified: Fri Dec 16 07:14:57 2016 mstenber
-# Edit time:     19 min
+# Last modified: Mon Dec 26 10:19:34 2016 mstenber
+# Edit time:     20 min
 #
 """
 
@@ -27,6 +27,10 @@ TYPE_FILENODE = 2
 # children are also FileTreeNodes / leaf children are FileData
 
 TYPE_FILEDATA = 3  # node itself is FileData
+
+TYPE_WEAKREFNODE = 4
+# children are WeakRefNodes / leaf children are WeakRefEntries
+
 
 TYPE_MASK = 0xF
 
