@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 16:29:53 2016 mstenber
-# Last modified: Sat Dec 24 06:50:50 2016 mstenber
+# Last modified: Thu Dec 29 22:26:13 2016 mstenber
 # Edit time:     46 min
 #
 """
@@ -84,7 +84,7 @@ def test_large_tree(hashleaf):
     random.shuffle(nodes)
     for i, n in enumerate(nodes):
         _debug('add #%d: %s', i, n)
-        root = root.add_to_tree(n)
+        root.add_to_tree(n)
         n2 = cl(n.name)
         # Ensure add result looks sane
         assert root.search(n2) is n

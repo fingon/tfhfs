@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Sat Dec 24 06:55:29 2016 mstenber
+# Last modified: Thu Dec 29 22:27:24 2016 mstenber
 # Edit time:     68 min
 #
 """
@@ -139,9 +139,6 @@ class INode:
     def __repr__(self):
         return '<INode #%d - n:%s ln:%s>' % (self.value, self.node, self.leaf_node)
 
-    def add_node_to_tree(self, n):
-        self.set_node(self.node.add_to_tree(n))
-
     def changed(self):
         if self.leaf_node or (self.node and isinstance(self.node, TreeNode)):
             self.direntry.set_data('st_mtime_ns', int(time.time() * 1e9))
@@ -172,7 +169,7 @@ class INode:
             n = DirectoryEntry(self.node.forest, name=b'')
             n.set_data('st_mode', const.FS_ROOT_MODE)
             n.set_data('st_uid', const.FS_ROOT_UID)
-            self.add_node_to_tree(n)
+            self.node.add_to_tree(n)
         return n
 
     def ref(self, count=1):

@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:50:30 2016 mstenber
-# Last modified: Sat Dec 24 18:53:00 2016 mstenber
-# Edit time:     337 min
+# Last modified: Fri Dec 30 08:41:58 2016 mstenber
+# Edit time:     339 min
 #
 """This is the file abstraction which is an INode subclass.
 
@@ -52,6 +52,7 @@ from forest_nodes import FileBlockEntry, FileBlockTreeNode, FileData
 
 _debug = logging.getLogger(__name__).debug
 
+KEY_STRUCT_FORMAT='>Q' # 64 bit long long
 
 class FileDescriptor:
     inode = None
@@ -154,7 +155,7 @@ class FileINode(util.DirtyMixin, inode.INode):
             # If the child node does not exist, create it and add to tree
             if not cn:
                 cn = FileBlockEntry(self.forest, name=k)
-                self.add_node_to_tree(cn)
+                self.node.add_to_tree(cn)
             return cn, s
 
         def _store_entry(t):
@@ -248,7 +249,7 @@ class FileINode(util.DirtyMixin, inode.INode):
             ll = n.last_leaf
         except IndexError:
             return 0
-        (ofs,) = struct.unpack('>I', ll.key)
+        (ofs,) = struct.unpack(KEY_STRUCT_FORMAT, ll.key)
         r = (ofs * const.BLOCK_SIZE_LIMIT) + len(ll.content)
         _debug('size full %d, partial %s=%d => %d',
                ofs, ll.key, len(ll.content), r)
@@ -334,7 +335,7 @@ class FileINode(util.DirtyMixin, inode.INode):
                     ll = self.node.last_leaf
                 except IndexError:
                     break
-                (ofs,) = struct.unpack('>I', ll.key)
+                (ofs,) = struct.unpack(KEY_STRUCT_FORMAT, ll.key)
                 ofs = ofs * const.BLOCK_SIZE_LIMIT
                 if ofs >= size:
                     self.node.remove_from_tree(ll)
@@ -394,7 +395,7 @@ class FileINode(util.DirtyMixin, inode.INode):
         ofs -= kn * const.BLOCK_SIZE_LIMIT
         ofs = int(ofs)
         _debug(' => block#%d ofs#%d', kn, ofs)
-        k = struct.pack('>I', int(kn))
+        k = struct.pack(KEY_STRUCT_FORMAT, int(kn))
         size = min(size, const.BLOCK_SIZE_LIMIT - ofs)
         _debug(' => size %d', size)
         return k, ofs, size

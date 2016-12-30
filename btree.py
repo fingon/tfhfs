@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jun 25 15:36:58 2016 mstenber
-# Last modified: Sat Dec 24 11:30:08 2016 mstenber
-# Edit time:     313 min
+# Last modified: Thu Dec 29 22:25:40 2016 mstenber
+# Edit time:     319 min
 #
 """This is the 'btree' module.
 
@@ -142,15 +142,14 @@ node. """
             tn.add_child_nocheck(self._pop_child(-1), idx=0)
         tn.key = tn.child_keys[0]
         if self.parent is not None:
-            _debug(' did not cause new root')
-            return self.parent.add_child(tn)
-        # We're root -> Add new level
-        _debug(' caused new root')
+            self.parent.add_child(tn)
+            return
         tn2 = self.create()
-        self.key = self.child_keys[0]
-        tn2.add_child_nocheck(self, idx=0)
-        tn2.add_child_nocheck(tn, idx=1)
-        return tn2
+        while self.children:
+            tn2.add_child_nocheck(self._pop_child(-1), idx=0)
+        tn2.key = tn2.child_keys[0]
+        self.add_child_nocheck(tn2, idx=0)
+        self.add_child_nocheck(tn, idx=1)
 
     def add_to_tree(self, c):
         _debug('adding %s to %s', c, self)
@@ -158,9 +157,9 @@ node. """
         if sc:
             assert sc.key != c.key
             _debug(' closest match: %s', sc)
-            return sc.parent.add_child(c) or self
-
-        return self.add_child(c) or self
+            sc.parent.add_child(c)
+            return
+        self.add_child(c)
 
     @property
     def children(self):

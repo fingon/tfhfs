@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Sat Dec 24 07:38:08 2016 mstenber
+# Last modified: Thu Dec 29 22:28:38 2016 mstenber
 # Edit time:     327 min
 #
 """
@@ -219,7 +219,7 @@ class Operations(llfuse.Operations):
             self.unlink(new_parent_inode, new_name, ctx)
         rn = parent_inode.node
         leaf = rn.leaf_class(self.forest, name=new_name)
-        self.forest.inodes.get_by_node(rn).add_node_to_tree(leaf)
+        rn.add_to_tree(leaf)
         inode.set_leaf_node(leaf)
         # TBD: This clearly mutilates 'mode' (and other attributes)
         # quite severely as they are essentially default values. Is it
