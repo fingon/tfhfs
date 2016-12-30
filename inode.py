@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Fri Dec 30 12:58:33 2016 mstenber
-# Edit time:     80 min
+# Last modified: Fri Dec 30 15:18:21 2016 mstenber
+# Edit time:     85 min
 #
 """
 
@@ -141,7 +141,7 @@ class INode:
         return '<INode id%s #%d - n:%s ln:%s>' % (id(self), self.value,
                                                   self.node, self.leaf_node)
 
-    def changed2(self, ctime=True, mtime=True):
+    def change_times(self, *, ctime=True, mtime=True, atime=True):
         if not self.leaf_node and not (self.node and isinstance(self.node, TreeNode)):
             return
         t = int(time.time() * 1e9)
@@ -150,20 +150,18 @@ class INode:
             de.set_data('st_ctime_ns', t)
         if mtime:
             de.set_data('st_mtime_ns', t)
-        _debug('%s changed %s', self,
-               (ctime and mtime and "ctime+mtime")
-               or (ctime and "ctime" or "mtime"))
-        self.changed_atime()
+        de.set_data('st_atime_ns', t)
+        _debug('%s change_times a:%s,c:%s,m:%s = %s',
+               self, atime, ctime, mtime, t)
 
-    def changed_atime(self):
-        t = int(time.time() * 1e9)
-        self.direntry.set_data('st_atime_ns', t)
+    def change_atime(self):
+        self.change_times(mtime=False, ctime=False)
 
-    def changed_ctime(self):
-        self.changed2(mtime=False)
+    def change_ctime(self):
+        self.change_times(ctime=True, mtime=False)
 
-    def changed_mtime(self):
-        self.changed2(ctime=False)
+    def change_mtime(self):
+        self.change_times(ctime=False, mtime=True)
 
     def deref(self, count=1):
         assert count > 0

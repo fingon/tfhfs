@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Fri Dec 30 14:44:34 2016 mstenber
-# Edit time:     445 min
+# Last modified: Fri Dec 30 15:34:39 2016 mstenber
+# Edit time:     459 min
 #
 """
 
@@ -58,7 +58,8 @@ RX_OK = os.R_OK | os.X_OK
 
 def assert_or_errno(stmt, err, desc=None):
     if not stmt:
-        _debug('result:%s(%d) %s', errno.errorcode.get(err, '???'), err, desc and desc or '')
+        _debug('result:%s(%d) %s', errno.errorcode.get(
+            err, '???'), err, desc and desc or '')
         raise llfuse.FUSEError(err)
 
 
@@ -214,9 +215,9 @@ class Operations(llfuse.Operations):
             else:
                 file_inode = self.forest.create_file(pn, name, mode=mode)
                 self._set_de_perms_from_ctx(file_inode.direntry, ctx)
-                pn.changed2()
+                pn.change_times()
             fd = file_inode.open(flags)
-            file_inode.changed_mtime()
+            file_inode.change_mtime()
         except:
             file_inode.deref()
             raise
@@ -248,11 +249,14 @@ class Operations(llfuse.Operations):
 
     def getattr(self, inode, ctx):
         assert self._initialized
+        inode = self.forest.inodes.get_by_value(inode)
+        _debug('getattr %s', inode)
         # assert_or_errno(self.access(inode, os.R_OK, ctx, or_own=True), EPERM)
-        return self._inode_attributes(self.forest.inodes.get_by_value(inode))
+        return self._inode_attributes(inode)
 
     def getxattr(self, inode, name, ctx):
         assert self._initialized
+        _debug('getxattr %s %s', inode, name)
         # assert_or_errno(self.access(inode, os.R_OK, ctx, or_own=True), EPERM)
         inode = self.forest.inodes.get_by_value(inode)
         xa = inode.direntry.data.get('xattr')
@@ -275,7 +279,8 @@ class Operations(llfuse.Operations):
         leaf = rn.leaf_class(self.forest, name=new_name)
         rn.add_to_tree(leaf)
         inode.set_leaf_node(leaf)
-        inode.changed2()
+        inode.change_ctime()
+        pn.change_times()
         # TBD: This clearly mutilates 'mode' (and other attributes)
         # quite severely as they are essentially default values. Is it
         # a problem?
@@ -311,6 +316,7 @@ class Operations(llfuse.Operations):
 
     def lookup(self, parent_inode, name, ctx):
         n = self._lookup(parent_inode, name, ctx)
+        _debug('lookup %s %s', parent_inode, name)
         assert_or_errno(n, ENOENT, 'no entry in tree')
         return self._inode_attributes(n)
 
@@ -343,23 +349,23 @@ class Operations(llfuse.Operations):
         _debug('open i:%d f:0x%x %s', inode, flags, ctx)
         inode = self.forest.inodes.get_by_value(inode)
         if _flags_to_perm(flags) & os.W_OK:
-            inode.changed_mtime()
+            inode.change_mtime()
         else:
-            inode.changed_atime()
+            inode.change_atime()
         return inode.open(flags)
 
     def opendir(self, inode, ctx):
         assert self._initialized
         assert_or_errno(self.access(inode, RX_OK, ctx), EPERM, 'no rx perm')
         inode = self.forest.inodes.get_by_value(inode)
-        inode.changed_atime()
+        inode.change_atime()
         inode.ref()
         return inode.value
 
     def read(self, fh, off, size):
         assert self._initialized
         fh = self.forest.fds.get_by_value(fh)
-        # fh.inode.changed_atime()  # is this sane?
+        # fh.inode.change_atime()  # is this sane?
         return fh.read(off, size)
 
     def readdir(self, fh, off):
@@ -447,7 +453,16 @@ class Operations(llfuse.Operations):
             self.link(n.value, parent_inode_new.value, name_new, ctx)
             n2 = self._lookup(parent_inode_new, name_new, ctx)
             assert n2
-            n2.direntry.data.update(old_data)
+            new_data = old_data.copy()
+            # TBD: Do we want to avoid copying something else too?
+            for pointless_key in ['st_atime_ns',
+                                  'st_ctime_ns',
+                                  # 'st_mtime_ns',
+                                  ]:
+                new_data.pop(pointless_key, None)
+            for k, v in new_data.items():
+                n2.direntry.set_data(k, v)
+            n2.change_ctime()
             n2.deref()
 
         finally:
@@ -465,7 +480,7 @@ class Operations(llfuse.Operations):
             self._ctx_sticky_mutate_check(ctx, pn, n)
             assert_or_errno(not n.node.children, ENOTEMPTY)
             n.leaf_node.root.remove_from_tree(n.leaf_node)
-            pn.changed2()
+            pn.change_times()
             # TBD: Also check the subdir permission?
         finally:
             n.deref()
@@ -504,10 +519,10 @@ class Operations(llfuse.Operations):
 
         if fields.update_mtime:
             _debug('%s mtime set to %s', inode, attr.st_mtime_ns)
-            pending_changes['st_mtime_ns'] =  attr.st_mtime_ns
+            pending_changes['st_mtime_ns'] = attr.st_mtime_ns
         if fields.update_size:
             pending_changes['st_size'] = attr.st_size
-        pending_changes = {k:v for k, v in pending_changes.items()
+        pending_changes = {k: v for k, v in pending_changes.items()
                            if k not in de.data or de.data[k] != v}
         if pending_changes:
             for k, v in pending_changes.items():
@@ -518,7 +533,7 @@ class Operations(llfuse.Operations):
                     inode.set_size(v)
                 else:
                     de.set_data(k, v)
-        inode.changed_ctime()
+        inode.change_ctime()
         return self._inode_attributes(inode)
 
     def setxattr(self, inode, name, value, ctx):
@@ -598,7 +613,7 @@ class Operations(llfuse.Operations):
                 assert_or_errno(not n.leaf_node.is_dir, EPERM, 'dir target')
             pn.node.remove_from_tree(n.leaf_node)
             n.set_leaf_node(None)
-            pn.changed2()
+            pn.change_times()
         finally:
             n.deref()
 

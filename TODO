@@ -2,25 +2,11 @@
 
 * Pending (before it can be used for ANYTHING)
 
-** Fix fstest cases
-
-given
-
-# ( cd /tmp/x && prove5.18 -f -o -r ~mstenber/git/fstest/tests ) 2>&1 | tee log.txt ; umount /tmp/x
-
-before this project started:
-
-egrep '^not ok' ~/log.txt | wc -l = 619
-
-now: 87
-
-** Write more thorough filesystem tests to test_ops or elsewhere
-
 ** Correct readdir semantics
 
 mutation should not result in non-mutated files being omitted/returned
-twice (this should be trivially given we iterate automatically by filename
-within the tree order?)
+twice (this should be trivially true given we iterate automatically by
+filename within the tree order?)
 
 * Pending before it can be used for single-user, multiple-installations
 
@@ -46,6 +32,64 @@ so the remoting will have two modes:
 ** Sticky bit
 
 * Pending (eventually)
+
+** Write more thorough filesystem tests to test_ops or elsewhere
+
+- 100% unit test coverage would be nice (for now, fstest does lots of heavy
+  lifting but takes minute+ to complete)
+
+** Fix fstest cases
+
+given
+
+# ( cd /tmp/x && prove5.18 -f -o -r ~mstenber/git/fstest/tests ) 2>&1 | tee log.txt ; umount /tmp/x
+
+before this project started:
+
+egrep '^not ok' ~/log.txt | wc -l
+
+= 619
+
+now: 85
+
+Test Summary Report
+-------------------
+/Users/mstenber/git/fstest/tests/link/00.t    (Wstat: 0 Tests: 82 Failed: 44)
+  Failed tests:  4-15, 18-20, 22, 24, 30-41, 44-46, 48, 50
+                55-58, 60, 62-65, 67
+/Users/mstenber/git/fstest/tests/link/02.t    (Wstat: 0 Tests: 10 Failed: 4)
+  Failed tests:  2, 4-6
+/Users/mstenber/git/fstest/tests/link/03.t    (Wstat: 0 Tests: 16 Failed: 5)
+  Failed tests:  6, 8-11
+/Users/mstenber/git/fstest/tests/link/06.t    (Wstat: 0 Tests: 18 Failed: 2)
+  Failed tests:  7-8
+/Users/mstenber/git/fstest/tests/link/07.t    (Wstat: 0 Tests: 17 Failed: 2)
+  Failed tests:  7-8
+/Users/mstenber/git/fstest/tests/link/09.t    (Wstat: 0 Tests: 5 Failed: 2)
+  Failed tests:  2, 4
+
+^ link cases not surprising, as tfhfs does not implement normal link
+  semantics (yet?)
+
+/Users/mstenber/git/fstest/tests/open/17.t    (Wstat: 0 Tests: 3 Failed: 1)
+  Failed test:  2
+
+^ some weirdness with mkfifo <> fuse (ENXIO <> EPERM)
+
+/Users/mstenber/git/fstest/tests/rename/00.t  (Wstat: 0 Tests: 79 Failed: 16)
+  Failed tests:  7-9, 11, 13-14, 27-29, 31, 33-34, 49, 53
+                57, 61
+
+^ early ones are link related; last ones are not, gnn; seems possibly OS X
+  bug? still, just ctime wrong on rename, so not big problem, hopefully
+
+/Users/mstenber/git/fstest/tests/unlink/00.t  (Wstat: 0 Tests: 55 Failed: 9)
+  Failed tests:  15-17, 20-22, 51-53
+
+^ again, link case
+
+Files=184, Tests=1944, 77 wallclock secs ( 0.74 usr  0.38 sys + 12.05 cusr
+10.10 csys = 23.27 CPU)
 
 ** Performance improvement ideas
 

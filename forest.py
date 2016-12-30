@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Fri Dec 30 13:40:10 2016 mstenber
-# Edit time:     679 min
+# Last modified: Fri Dec 30 15:13:00 2016 mstenber
+# Edit time:     681 min
 #
 """This is the 'forest layer' main module.
 
@@ -115,20 +115,20 @@ class Forest:
         if node:
             node.mark_dirty()
         leaf.set_data('st_mode', mode)
-        inode.changed2()
+        inode.change_times()
         return inode
 
     def create_dir(self, dir_inode, name, *, mode=0):
         if not stat.S_IFMT(mode):
             mode |= stat.S_IFDIR
-        dir_inode.changed2()
+        dir_inode.change_times()
         _debug('create_dir %s 0x%x', name, mode)
         return self._create(mode, dir_inode, name)
 
     def create_file(self, dir_inode, name, *, mode=0):
         if not stat.S_IFMT(mode):
             mode |= stat.S_IFREG
-        dir_inode.changed2()
+        dir_inode.change_times()
         _debug('create_file %s 0x%x', name, mode)
         return self._create(mode, dir_inode, name)
 
