@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Aug 16 12:56:24 2016 mstenber
-# Last modified: Fri Dec 30 16:41:28 2016 mstenber
+# Last modified: Fri Jan 13 10:51:04 2017 mstenber
 # Edit time:     461 min
 #
 """
@@ -36,19 +36,19 @@ http://pythonhosted.org/llfuse/fuse_api.html
 
 """
 import collections
+import errno
+import grp
 import logging
 import os
-import stat
-import errno
-from errno import EEXIST, ENOATTR, ENOENT, ENOTEMPTY, EPERM
-from ms.lazy import lazy_property
 import pwd
-import grp
+import stat
+from errno import EEXIST, EMLINK, ENOATTR, ENOENT, ENOTEMPTY, EPERM
 
 import const
 import forest_nodes
-import llfuse
 import inode
+import llfuse
+from ms.lazy import lazy_property
 
 _debug = logging.getLogger(__name__).debug
 
@@ -271,7 +271,7 @@ class Operations(llfuse.Operations):
         assert_or_errno(self.access(new_parent_inode, WX_OK, ctx), EPERM,
                         'no write access to new parent inode')
         inode = self.forest.inodes.get_by_value(inode)
-        assert_or_errno(not inode.leaf_node, EEXIST,
+        assert_or_errno(not inode.leaf_node, EMLINK,
                         'file already linked somewhere')
         pn = self.forest.inodes.get_by_value(new_parent_inode)
         n = self._lookup(pn, new_name, ctx, noref=True)
