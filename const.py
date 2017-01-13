@@ -9,14 +9,23 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jul  2 21:10:04 2016 mstenber
-# Last modified: Fri Dec 30 12:55:35 2016 mstenber
-# Edit time:     20 min
+# Last modified: Fri Jan 13 13:29:17 2017 mstenber
+# Edit time:     22 min
 #
 """
 
 """
 
 import stat
+
+# external information about block (not encoded inside block):
+# - refcnt (number)
+# - BLOCK_TYPE
+
+BLOCK_TYPE_NORMAL = 1  # has references reflected in the system, has data
+BLOCK_TYPE_MISSING = 2  # has references reflected in the system, has no data
+BLOCK_TYPE_WEAK = 3  # has no references reflected in the system, has data
+
 
 # 'type' of a (typed) block.
 
@@ -28,14 +37,8 @@ TYPE_FILENODE = 2
 
 TYPE_FILEDATA = 3  # node itself is FileData
 
-TYPE_WEAKREFNODE = 4
-# children are WeakRefNodes / leaf children are WeakRefEntries
-
 
 TYPE_MASK = 0xF
-
-BIT_WEAK = 0x20  # weak block -> no references
-# TBD: Is this needed? Possibly for the non-full client case?
 
 BIT_LEAFY = 0x40  # children are leaves of base type
 

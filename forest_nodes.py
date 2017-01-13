@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Fri Jan 13 12:51:44 2017 mstenber
+# Last modified: Fri Jan 13 13:30:30 2017 mstenber
 # Edit time:     143 min
 #
 """
@@ -404,25 +404,14 @@ class FileData(DirtyMixin, BlockIdReferrerMixin):
     def unload_if_possible(self, protected_set):
         pass
 
-
-class WeakRefEntry(NamedLeafNode):
-    name_hash_size = 0
-
-
-class WeakRefNode(LoadedTreeNode):
-    leaf_class = WeakRefEntry
-    entry_type = const.TYPE_WEAKREFNODE
-
 _type_to_loaded_tree_node_subclass = {}
 
 for cl in LoadedTreeNode.__subclasses__():
     _type_to_loaded_tree_node_subclass[cl.entry_type] = cl
 
 
-def any_node_block_data_references_callback(block_data, *, ignore_weak=False):
+def any_node_block_data_references_callback(block_data):
     (rt, d) = block_data
-    if rt & const.BIT_WEAK and not ignore_weak:
-        return
     t = rt & const.TYPE_MASK
     cl = _type_to_loaded_tree_node_subclass.get(t)
     if cl is not None:

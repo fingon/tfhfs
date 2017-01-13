@@ -2,23 +2,21 @@
 
 * Pending (before it can be used for ANYTHING)
 
-** Rethink if I really want to use dynamic inodes or not
-
-Hardlinks are used by some apps -> if want to use transparently _any_
-unix apps, hard links are must -> instead of directory tree, inode tree
-should be core construct.
-
-** Correct readdir semantics
-
-mutation should not result in non-mutated files being omitted/returned
-twice (this should be trivially true given we iterate automatically by
-filename within the tree order?)
-
 * Pending before it can be used for single-user, multiple-installations
+
+** Implement other outside-block types and the associated glue in storage
+
+- weak blocks
+ - may have references _to_ them
+ - BUT no references _from_ them in the graph
+
+- phantom/missing blocks
+ - have references (to it, even from it), but data is gone
+ - due to e.g. I/O errors
 
 ** Implement tree remote protocol
 
-essentially have to store locally from leaves onward; otherwise refcnts are
+Essentially have to store locally from leaves onward; otherwise refcnts are
 wrong. however, how does partial tree work in this case? it does not,
 really.
 
@@ -28,10 +26,6 @@ so the remoting will have two modes:
 
 - strong references + stored remote trees to be merged
  - should store leaves first so we can correctly handle dependencies..
-
-** Implement tree merge code (SHOULD be straightforward, but who knows)
-
-*** Bare bones code IS there, but it needs unit tests
 
 * Pending before it can be used (reliably) for multi-user
 
@@ -190,3 +184,17 @@ to get correct as well. (synchronization may be painful)
 
 reasonable performance (at least based on their own 2012 benchmarks);
 should know how llfuse compares though..
+
+
+*** I probably want to use fixed inodes in the next iteration
+
+Hardlinks are used by some apps -> if want to use transparently _any_
+unix apps, hard links are must -> instead of directory tree, inode tree
+should be core construct.
+
+*** Correct readdir semantics
+
+mutation should not result in non-mutated files being omitted/returned
+twice (this should be trivially true given we iterate automatically by
+filename within the tree order?); current implementation is bit vague on
+the topic..
