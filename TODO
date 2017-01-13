@@ -114,6 +114,11 @@ umount /tmp/x
 CPU bound but instead 2/3 of time spent in dd sets up the upper bound (at
 least on OS X).
 
+**** raw native hfs
+
+file _creation_ (30GB file) = 68sec = <500 MB/s
+file _reading_ (30GB file):
+30000000000 bytes transferred in 30.563466 secs (981564065 bytes/sec) = 981MB/s
 
 *** Rethink the parallelization scheme
 
@@ -175,3 +180,13 @@ sensible but possibly minor optimization.
 ** Real supplementary group support
 
 *** (For now, we parse pwd/grp, which, while nice, is not correct)
+
+** Rewrite in e.g. Go?
+
+*** https://github.com/hanwen/go-fuse/ looks mature
+
+Every op in own coroutine -> trivially parallelizable _and_ reasonably easy
+to get correct as well. (synchronization may be painful)
+
+reasonable performance (at least based on their own 2012 benchmarks);
+should know how llfuse compares though..
