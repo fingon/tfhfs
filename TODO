@@ -2,6 +2,12 @@
 
 * Pending (before it can be used for ANYTHING)
 
+** Rethink if I really want to use dynamic inodes or not
+
+Hardlinks are used by some apps -> if want to use transparently _any_
+unix apps, hard links are must -> instead of directory tree, inode tree
+should be core construct.
+
 ** Correct readdir semantics
 
 mutation should not result in non-mutated files being omitted/returned
@@ -29,9 +35,12 @@ so the remoting will have two modes:
 
 * Pending before it can be used (reliably) for multi-user
 
-** Sticky bit
-
 * Pending (eventually)
+
+** Think through the timestamp updates
+
+They should occur only at end of particular fuse operation, using same
+fixed timestamp
 
 ** Write more thorough filesystem tests to test_ops or elsewhere
 
@@ -92,6 +101,19 @@ Files=184, Tests=1944, 77 wallclock secs ( 0.74 usr  0.38 sys + 12.05 cusr
 10.10 csys = 23.27 CPU)
 
 ** Performance improvement ideas
+
+*** empty file, no backend
+
+dd if=/dev/null of=/tmp/x/foo bs=1 count=1 oseek=1000000000
+dd if=/tmp/x/foo of=/dev/null bs=1024000
+umount /tmp/x
+
+=> 260 MB/s currently (with in-memory storage)
+
+~1/3 of CPU time spent in Python, so I guess it is not really even Python
+CPU bound but instead 2/3 of time spent in dd sets up the upper bound (at
+least on OS X).
+
 
 *** Rethink the parallelization scheme
 
