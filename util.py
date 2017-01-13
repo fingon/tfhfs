@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:06:01 2016 mstenber
-# Last modified: Fri Dec 30 12:56:50 2016 mstenber
-# Edit time:     62 min
+# Last modified: Fri Jan 13 12:38:25 2017 mstenber
+# Edit time:     63 min
 #
 """
 
@@ -121,7 +121,7 @@ class DirtyMixin:
 
     def mark_dirty(self):
         if self.dirty:
-            _debug('%s already dirty', self)
+            #_debug('%s already dirty', self)
             return
         _debug('marked dirty: %s', self)
         self.dirty = True

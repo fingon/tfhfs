@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Tue Jul  5 11:49:58 2016 mstenber
-# Last modified: Fri Dec 30 13:02:01 2016 mstenber
-# Edit time:     97 min
+# Last modified: Fri Jan 13 12:37:25 2017 mstenber
+# Edit time:     117 min
 #
 """
 
@@ -123,17 +123,21 @@ def test_wideforest():
         assert inode
 
 
-@pytest.mark.run(order=0)
-def test_merge3_file():
+@pytest.mark.parametrize('iter', [0, 1])
+def test_merge3_file(iter):
     remote_name = b'remote'
     remote_old_name = b'remote_old'
 
-    _debug('# set up %s', remote_name)
+    _debug('# set up @%s', remote_name)
     storage = DictStorage()
     rf = forest.Forest(storage, content_name=remote_name)
-    same = rf.create_file(rf.root, name=b'foosame')
-    rm = rf.create_file(rf.root, name=b'foorm')
-    chg = rf.create_file(rf.root, name=b'foochange')
+    same = rf.create_file(rf.root, name=b'same')
+    rm = rf.create_file(rf.root, name=b'rm')
+    chg = rf.create_file(rf.root, name=b'chg')
+    subdir = rf.create_dir(rf.root, name=b'subdir')
+    subsame = rf.create_file(subdir, name=b'subsame')
+    subrm = rf.create_file(subdir, name=b'subrm')
+    subchg = rf.create_file(subdir, name=b'subchg')
     rf.flush()
 
     _debug('# set up local')
@@ -143,6 +147,10 @@ def test_merge3_file():
     f.merge_remote(remote_name, remote_old_name)
     for n in [same, rm, chg]:
         assert f.root.node.search_name(n.leaf_node.name)
+    lsubdir = f.lookup(f.root, subdir.leaf_node.name)
+    assert lsubdir
+    for n in [subsame, subrm, subchg]:
+        assert lsubdir.node.search_name(n.leaf_node.name)
     f.flush()
 
     # should be nop from here on onward (more or less)
@@ -153,17 +161,32 @@ def test_merge3_file():
     # change 'foo' (diff. data)
     rf.unlink(rf.root, name=chg.leaf_node.name)
     chg2 = rf.create_file(rf.root, name=chg.leaf_node.name)
+    assert not chg.leaf_node.is_same(chg2.leaf_node)
 
-    # TBD: remove file
+    rf.unlink(subdir, name=subchg.leaf_node.name)
+    subchg2 = rf.create_file(subdir, name=subchg.leaf_node.name)
+
     rf.unlink(rf.root, name=rm.leaf_node.name)
+    rf.unlink(subdir, name=subrm.leaf_node.name)
     rf.flush()
 
-    f = forest.Forest(storage)
+    # Clever bit: Either way we merge (assuming remote_old is used as
+    # 'last state in sync for both), the result should be same.
+    d = {0: b'content', 1: remote_name}
+    content_name = d[iter]
+    other_name = d[1 - iter]
+
+    f = forest.Forest(storage, content_name=content_name)
     _debug('# attempt merge changes')
-    f.merge_remote(remote_name, remote_old_name)
-    exp = [(rm, None), (same, same), (chg2, chg2)]
-    for n, expn in exp:
-        gotde = f.root.node.search_name(n.leaf_node.name)
+    f.merge_remote(other_name, remote_old_name)
+    lsubdir = f.lookup(f.root, subdir.leaf_node.name)
+    assert lsubdir
+    exp = [(f.root, rm, None), (f.root, same, same), (f.root, chg2, chg2),
+           (lsubdir, subrm, None), (lsubdir, subsame, subsame),
+           (lsubdir, subchg2, subchg2),
+           ]
+    for dir_inode, n, expn in exp:
+        gotde = dir_inode.node.search_name(n.leaf_node.name)
         if not expn:
             assert not gotde
             continue

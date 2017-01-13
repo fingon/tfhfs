@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Thu Jun 30 14:25:38 2016 mstenber
-# Last modified: Fri Dec 30 15:13:00 2016 mstenber
-# Edit time:     681 min
+# Last modified: Fri Jan 13 12:58:25 2017 mstenber
+# Edit time:     701 min
 #
 """This is the 'forest layer' main module.
 
@@ -115,7 +115,7 @@ class Forest:
         if node:
             node.mark_dirty()
         leaf.set_data('st_mode', mode)
-        inode.change_times()
+        assert inode.change_times()
         return inode
 
     def create_dir(self, dir_inode, name, *, mode=0):
@@ -135,7 +135,6 @@ class Forest:
     def flush(self):
         if PRINT_DEBUG_FLUSH:
             print('flush')
-            import time
             t = time.time()
 
         # Four stages:
@@ -243,11 +242,11 @@ class Forest:
         # objects back and forth. 'self' may be in use, new_other and
         # old_other are used read-only and should not cause any
         # mutations to disk.
-        return self.merge3_dir_inode(self.root, new_other.root,
-                                     old_other and old_other.root)
+        return self._merge3_dir_inode(self.root, new_other.root,
+                                      old_other and old_other.root)
 
-    def merge3_dir_inode(self, inode, new_inode, old_inode):
-        _debug('merge3_dir_inode')
+    def _merge3_dir_inode(self, inode, new_inode, old_inode):
+        _debug('_merge3_dir_inode %s (%s->%s)', inode, old_inode, new_inode)
         # TBD: Do things with metadata
         # l = leaf from our tree
         # l2 = leaf from 'new' tree
@@ -257,12 +256,13 @@ class Forest:
 
         def _handle(l, nl):
             if l is not None:
+                assert l.forest
                 self.unlink(inode, l.name)
             if nl is None:
                 _debug('  removed')
                 return
+            assert nl.forest
             if l is not None:
-                l.set_forest_rec(None)
                 _debug('  replaced')
             else:
                 _debug('  added')
@@ -273,7 +273,7 @@ class Forest:
         # First step: Look at what we have
         for l in list(inode.node.get_leaves()):
             seen.add(l.key)
-            _debug(' %s', l.name)
+            _debug(' %s [our]', l.name)
             l2 = new_inode.node.search_name(l.name)
             if not l2:
                 # Other side does not have it.
@@ -283,8 +283,6 @@ class Forest:
                     # doing.
                     if not l.is_newer_than(l3):
                         _handle(l, None)
-                        continue
-                # Ok, other end should pick this up? Wait for it..
                 delta += 1
                 continue
 
@@ -293,15 +291,18 @@ class Forest:
 
             if l.is_dir and l2.is_dir:
                 # We can just recurse inside
+                in2 = None
+                in3 = None
                 try:
                     in1 = self.lookup(inode, l.name)
-                    in2 = new_inode.store.lookup(new_inode, l.name)
-                    in3 = old_inode and old_inode.store.lookup(
+                    in2 = new_inode.forest.lookup(new_inode, l.name)
+                    in3 = old_inode and old_inode.forest.lookup(
                         old_inode, l.name)
-                    delta += self.merge3_dir_inode(in1, in2, in3)
+                    delta += self._merge3_dir_inode(in1, in2, in3)
                 finally:
                     in1.deref()
-                    in2.deref()
+                    if in2:
+                        in2.deref()
                     if in3:
                         in3.deref()
                 continue
@@ -311,21 +312,19 @@ class Forest:
                 # Looks like it was replaced? Who knows.  Scary
                 # stuff starts here.
                 _handle(l, l2)
-            else:
-                # We are newer?
-                delta += 1
+            delta += 1
 
         for l2 in list(new_inode.node.get_leaves()):
             if l2.key in seen:
                 continue
-            _debug(' %s', l2.name)
+            _debug(' %s [new]', l2.name)
             l3 = old_inode and old_inode.node.search_name(l2.name)
-            if l3:
-                # We saw it before but we did not want it; we still do not
-                delta += 1
-                continue
-            # Fine, we want this leaf! 'acquire' (no need to recurse)
-            _handle(None, l2)
+            if not l3:
+                # Fine, we want this leaf! 'acquire' (no need to recurse)
+                _handle(None, l2)
+            # Otherwise we saw it before but we did not want it
+            delta += 1
+
         if not delta:
             l = inode.direntry
             l2 = new_inode.direntry
@@ -335,12 +334,12 @@ class Forest:
                 if l2.is_newer_than(l):
                     node = new_inode.node
                     new_inode.set_node(None)
-                    node.set_forest_rec(inode.store)
+                    node.set_forest_rec(inode.forest)
                     inode.set_node(node)
                     _debug('  replaced from remote')
                 else:
-                    delta += 1
                     _debug('  remote should replace')
+                delta += 1
         return delta
 
     def refer_or_store_block_by_data(self, d):

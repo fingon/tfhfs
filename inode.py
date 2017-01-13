@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:42:50 2016 mstenber
-# Last modified: Fri Dec 30 15:18:21 2016 mstenber
+# Last modified: Fri Jan 13 12:21:45 2017 mstenber
 # Edit time:     85 min
 #
 """
@@ -153,6 +153,7 @@ class INode:
         de.set_data('st_atime_ns', t)
         _debug('%s change_times a:%s,c:%s,m:%s = %s',
                self, atime, ctime, mtime, t)
+        return True
 
     def change_atime(self):
         self.change_times(mtime=False, ctime=False)

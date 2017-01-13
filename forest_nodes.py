@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec  3 17:45:55 2016 mstenber
-# Last modified: Fri Dec 30 13:20:25 2016 mstenber
-# Edit time:     135 min
+# Last modified: Fri Jan 13 12:51:44 2017 mstenber
+# Edit time:     143 min
 #
 """
 
@@ -82,6 +82,10 @@ class BlockIdReferrerMixin:
         self._block_id = v
 
     def set_forest_rec(self, forest):
+        assert forest
+        # While this looks crazy, it is actually correct, as it sets
+        # things using the above setter (removing reference from
+        # forest we leave, and adding it to forest we join)
         bid = self.block_id
         if bid:
             self.block_id = None
@@ -162,7 +166,9 @@ class LoadedTreeNode(BlockIdReferrerMixin, DirtyMixin, btree.TreeNode):
         if self.parent is not None:
             return
         self.forest.dirty_node_set.add(self)
-        self.forest.inodes.get_by_node(self)  # debug check
+        # self.forest.inodes.get_by_node(self)  # debug check
+        # ^ above is almost always correct, but if node is moving
+        # from forest to another, it is not
 
     def perform_flush(self):
         if not self.is_loaded:
@@ -206,6 +212,7 @@ class LoadedTreeNode(BlockIdReferrerMixin, DirtyMixin, btree.TreeNode):
         BlockIdReferrerMixin.set_forest_rec(self, forest)
         if not self._loaded:
             return
+        self.mark_dirty()
         for child in self._children:
             child.set_forest_rec(forest)
 
@@ -280,7 +287,9 @@ class NamedLeafNode(BlockIdReferrerMixin, DataMixin, btree.LeafNode):
         self.block_id = block_id
 
     def set_forest_rec(self, forest):
+        assert forest
         BlockIdReferrerMixin.set_forest_rec(self, forest)
+        self.mark_dirty()
         inode = self.forest.inodes.getdefault_by_leaf_node(self)
         if inode:
             if inode.node:
@@ -306,7 +315,9 @@ class DirectoryEntry(NamedLeafNode):
         # TBD: Care about something else too?
         if self.block_id != o.block_id:
             return False
-        return sorted(self.pickler.get_internal_dict_items(self)) == sorted(o.pickler.get_internal_dict_items(self))
+        i1 = sorted(self.pickler.get_internal_dict_items(self))
+        i2 = sorted(o.pickler.get_internal_dict_items(o))
+        return i1 == i2
 
     def is_newer_than(self, o):
         mtime = self.data.get('st_mtime_ns', 0)
