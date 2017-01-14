@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Jul  2 21:10:04 2016 mstenber
-# Last modified: Fri Jan 13 13:29:17 2017 mstenber
-# Edit time:     22 min
+# Last modified: Sat Jan 14 09:53:43 2017 mstenber
+# Edit time:     28 min
 #
 """
 
@@ -20,12 +20,18 @@ import stat
 
 # external information about block (not encoded inside block):
 # - refcnt (number)
-# - BLOCK_TYPE
+# - BLOCK_TYPE, one of the following:
 
-BLOCK_TYPE_NORMAL = 1  # has references reflected in the system, has data
-BLOCK_TYPE_MISSING = 2  # has references reflected in the system, has no data
-BLOCK_TYPE_WEAK = 3  # has no references reflected in the system, has data
+BLOCK_TYPE_NORMAL = 0  # sub-references in the system, has data
+BLOCK_TYPE_MISSING = 1  # sub-references in the system, no data
+BLOCK_TYPE_WANT_NORMAL = 2  # no sub-references in the system, no data
 
+BLOCK_TYPE_WEAK = 3  # no sub-references in the system, has data
+BLOCK_TYPE_WEAK_MISSING = 4  # no sub-references in the system, no data
+
+# TYPE_NORMAL and TYPE_WEAK are the normal types; the rest are
+# basically pending acquisition, and the type just indicates what
+# should be done with it next.
 
 # 'type' of a (typed) block.
 
