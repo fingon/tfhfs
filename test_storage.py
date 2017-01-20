@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Sat Dec 24 07:16:34 2016 mstenber
-# Edit time:     176 min
+# Last modified: Fri Jan 20 18:34:48 2017 mstenber
+# Edit time:     181 min
 #
 """
 
@@ -25,6 +25,7 @@ import unittest
 import cryptography.exceptions
 import pytest
 
+import const
 import storage as st
 
 _debug = logging.getLogger(__name__).debug
@@ -54,16 +55,19 @@ def _prod_storage(s, flush=_nop):
     s.store_block(b'foo', b'bar')
     _flush_twice(s, flush)
     assert s.get_block_data_by_id(b'foo') == b'bar'
+    assert s.get_block_by_id(b'foo').refcnt == 1
 
     # refcnt = 2
     s.refer_block(b'foo')
     _flush_twice(s, flush)
     assert s.get_block_data_by_id(b'foo') == b'bar'
+    assert s.get_block_by_id(b'foo').refcnt == 2
 
     # refcnt = 1
     assert s.release_block(b'foo')
     _flush_twice(s, flush)
     assert s.get_block_data_by_id(b'foo') == b'bar'
+    assert s.get_block_by_id(b'foo').refcnt == 1
 
     # refcnt = 0 => should be gone
     _debug('## final release of foo')
@@ -108,16 +112,18 @@ def _prod_storage(s, flush=_nop):
     s.set_block_data_references_callback(_depfun)
     s.store_block(b'id2', b'content2')
     s.store_block(b'id1', b'content1')
+    s.store_block(b'id3', b'content3', type=const.BLOCK_TYPE_WEAK)
     _flush_twice(s, flush)
-    assert s.get_block_by_id(b'id1')[1] == 1
+    assert s.get_block_by_id(b'id1').refcnt == 1
     if flush is not _nop:
-        assert s.get_block_by_id(b'id2')[1] == 2
+        assert s.get_block_by_id(b'id2').refcnt == 2
 
     _debug('## release id2 (should still be around due to dep in id1)')
     s.release_block(b'id2')
+    s.release_block(b'id3')  # and id3 should not have deps due to weak
     _flush_twice(s, flush)
-    assert s.get_block_by_id(b'id2')[1] == 1
-    assert s.get_block_by_id(b'id1')[1] == 1
+    assert s.get_block_by_id(b'id2').refcnt == 1
+    assert s.get_block_by_id(b'id1').refcnt == 1
 
     _debug('## release id1 (should release both)')
     s.release_block(b'id1')
@@ -133,14 +139,14 @@ def _prod_storage(s, flush=_nop):
         s.store_block(b'idk2', b'contentk2')
         s.store_block(b'idk', b'contentk')
         _flush_twice(s, flush)
-        assert s.get_block_by_id(b'idk2')[1] == 2
-        assert s.get_block_by_id(b'idk')[1] == 1
+        assert s.get_block_by_id(b'idk2').refcnt == 2
+        assert s.get_block_by_id(b'idk').refcnt == 1
         s.release_block(b'idk2')
         s.release_block(b'idk')
         _debug('# released; should still have post-flush')
         _flush_twice(s, flush)
-        assert s.get_block_by_id(b'idk2')[1] == 1
-        assert s.get_block_by_id(b'idk')[1] == 0
+        assert s.get_block_by_id(b'idk2').refcnt == 1
+        assert s.get_block_by_id(b'idk').refcnt == 0
         assert s.referenced_refcnt0_block_ids
         # Back to class default
         _debug('# no longer referred by inode')
@@ -176,7 +182,7 @@ def _prod_delayedstorage(s, be, flush=_nop):
     assert s.cache_size
 
     assert s.flush() == 1
-    assert be.get_block_by_id(b'foo')[0] == b'bar'
+    assert be.get_block_by_id(b'foo').data == b'bar'
     if not s.maximum_cache_size:
         assert s.cache_size
         assert s._blocks
