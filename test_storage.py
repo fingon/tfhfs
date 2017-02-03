@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Fri Jan 20 18:34:48 2017 mstenber
-# Edit time:     181 min
+# Last modified: Fri Feb  3 21:57:51 2017 mstenber
+# Edit time:     186 min
 #
 """
 
@@ -147,12 +147,12 @@ def _prod_storage(s, flush=_nop):
         _flush_twice(s, flush)
         assert s.get_block_by_id(b'idk2').refcnt == 1
         assert s.get_block_by_id(b'idk').refcnt == 0
-        assert s.referenced_refcnt0_block_ids
+        assert s.referenced_refcnt0_blocks
         # Back to class default
         _debug('# no longer referred by inode')
         s.block_id_has_references_callbacks = []  # for testing purposes only
         _flush_twice(s, flush)
-        assert not s.referenced_refcnt0_block_ids
+        assert not s.referenced_refcnt0_blocks
         assert not s.get_block_by_id(b'idk')
         assert not s.get_block_by_id(b'idk2')
 
@@ -167,6 +167,7 @@ def _prod_delayedstorage(s, be, flush=_nop):
     assert not isinstance(be, st.DelayedStorage)
     _prod_storage(s, flush=flush)
     # everything from _prod_storage should be in dirty cache => stateless
+    _debug('## ensure _prod_storage stateless')
     assert not s.flush()
 
     # ensure repeat set_block_name is nop
@@ -178,22 +179,22 @@ def _prod_delayedstorage(s, be, flush=_nop):
     # refcnt = 1
     s.store_block(b'foo', b'bar')
     assert s.get_block_data_by_id(b'foo') == b'bar'
-    assert be.get_block_by_id(b'foo') == None
+    assert be.get_block_by_id(s, b'foo') == None
     assert s.cache_size
 
     assert s.flush() == 1
-    assert be.get_block_by_id(b'foo').data == b'bar'
+    assert be.get_block_by_id(s, b'foo').data == b'bar'
     if not s.maximum_cache_size:
         assert s.cache_size
-        assert s._blocks
+        assert s._cache_bid2block
 
     _flush_twice(s, flush)
     if not s.maximum_cache_size:
-        assert s._blocks
+        assert s._cache_bid2block
 
     s.maximum_cache_size = -1  # may leave some metadata, but no block_data
     s.flush()
-    assert not s.cache_size, s._blocks
+    assert not s.cache_size
     assert not s.calculated_cache_size
 
 
@@ -292,7 +293,6 @@ def storage(request):
 
 @pytest.mark.parametrize('storage_attrs, use_flush',
                          [
-                             ({}, True),
                              ({}, True),
                              ({'maximum_cache_size': 1}, True),  # no cache
                              ({}, False),
