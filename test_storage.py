@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Fri Feb  3 21:57:51 2017 mstenber
-# Edit time:     186 min
+# Last modified: Sat Feb  4 22:45:52 2017 mstenber
+# Edit time:     195 min
 #
 """
 
@@ -304,3 +304,55 @@ def test_delayedstorage(storage_attrs, use_flush, backend):
     _prod_delayedstorage(s, backend, use_flush and s.flush or _nop)
     assert s.get_bytes_available() > 0
     assert s.get_bytes_used() > 0
+
+
+def test_storage_type_transitions_weak(storage):
+    s = storage  # for brevity
+    deps = {b'content1': [b'id2']}
+
+    def _depfun(block_data):
+        d = deps.get(block_data, [])
+        _debug('_depfun %s = %s', block_data, d)
+        return d
+    s.set_block_data_references_callback(_depfun)
+    s.store_block(b'id2', b'content2')
+    assert not s.flush()
+    s.store_block(b'id1', None, type=const.BLOCK_TYPE_WEAK_MISSING)
+    assert not s.flush()
+    b = s.get_block_by_id(b'id1')
+    b.set_data(b'content1')
+    b.set_type(const.BLOCK_TYPE_WEAK)
+    assert s.flush()
+    assert s.get_block_by_id(b'id2').refcnt == 1
+    b.set_data(None)
+    b.set_type(const.BLOCK_TYPE_WEAK_MISSING)
+    assert s.flush()
+    assert s.get_block_by_id(b'id2').refcnt == 1
+
+
+def test_storage_type_transitions_normal(storage):
+    s = storage  # for brevity
+    deps = {b'content1': [b'id2']}
+
+    def _depfun(block_data):
+        d = deps.get(block_data, [])
+        _debug('_depfun %s = %s', block_data, d)
+        return d
+    s.set_block_data_references_callback(_depfun)
+    s.store_block(b'id2', b'content2')
+    assert not s.flush()
+    s.store_block(b'id1', None, type=const.BLOCK_TYPE_WANT_NORMAL)
+    assert not s.flush()
+    b = s.get_block_by_id(b'id1')
+    b.set_data(b'content1')
+    b.set_type(const.BLOCK_TYPE_NORMAL)
+    assert s.flush()
+    assert s.get_block_by_id(b'id2').refcnt == 2
+    b.set_data(None)
+    b.set_type(const.BLOCK_TYPE_MISSING)
+    assert s.flush()
+    assert s.get_block_by_id(b'id2').refcnt == 2
+    b.set_data(b'content1')
+    b.set_type(const.BLOCK_TYPE_NORMAL)
+    assert s.flush()
+    assert s.get_block_by_id(b'id2').refcnt == 2

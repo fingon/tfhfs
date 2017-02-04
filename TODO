@@ -4,16 +4,6 @@
 
 * Pending before it can be used for single-user, multiple-installations
 
-** Implement other outside-block types and the associated glue in storage
-
-- weak blocks
- - may have references _to_ them
- - BUT no references _from_ them in the graph
-
-- phantom/missing blocks
- - have references (to it, even from it), but data is gone
- - due to e.g. I/O errors
-
 ** Implement tree remote protocol
 
 Essentially have to store locally from leaves onward; otherwise refcnts are

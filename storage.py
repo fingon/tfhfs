@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Fri Feb  3 22:15:51 2017 mstenber
-# Edit time:     1013 min
+# Last modified: Sat Feb  4 22:44:31 2017 mstenber
+# Edit time:     1016 min
 #
 """This is the 'storage layer' main module.
 
@@ -702,10 +702,13 @@ layer."""
                 self.release_block(block_id)
 
     def updated_block_type(self, block, old_type, new_type):
-        # Only case in which it is valid not to have data; all other state
+        # Only cases in which it is valid not to have data; all other state
         # transitions should end with us having data
         if new_type == const.BLOCK_TYPE_MISSING:
             assert old_type == const.BLOCK_TYPE_NORMAL
+            return
+        if new_type == const.BLOCK_TYPE_WEAK_MISSING:
+            assert old_type == const.BLOCK_TYPE_WEAK
             return
         assert block.data is not None  # changing type on missing/want = bad
         self.update_block_data_dependencies(block.data, True, new_type)
