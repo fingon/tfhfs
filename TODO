@@ -188,3 +188,12 @@ mutation should not result in non-mutated files being omitted/returned
 twice (this should be trivially true given we iterate automatically by
 filename within the tree order?); current implementation is bit vague on
 the topic..
+
+** _Optionally pad blocks
+
+.. if using small blocks, padding all blocks to arbitrary size might help hide
+traffic. e.g. https://www.cryfs.org does this. I am not convinced it is
+something I am particularly worried about though, and the cost is
+significant for small directories in the current design and even for moderately
+small files (e.g. 1.1 blocks size -> essentially almost triples size compared to
+current design to 3 full blocks).
