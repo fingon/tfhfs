@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sun Dec 25 08:04:44 2016 mstenber
-# Last modified: Sun Dec 25 10:17:10 2016 mstenber
-# Edit time:     55 min
+# Last modified: Tue Aug  1 18:48:25 2017 mstenber
+# Edit time:     62 min
 #
 """
 
@@ -62,18 +62,26 @@ if __name__ == '__main__':
     import time
 
     read_cmd = 'find /tmp/x -type f | xargs cat > /dev/null'
-    for desc, backend, backend_options in [
-            ('In-memory dict', '', []),
+    for desc, backend_type, backend, backend_options in [
+            ('In-memory dict', None, '', []),
             ('SQLite compressed+encrypted',
-             '/tmp/foo', ['-c', '-p', '/Users/mstenber/bin/insecurepassword']),
+             'sqlite', '/tmp/foo', ['-c', '-p', '/Users/mstenber/bin/insecurepassword']),
             ('SQLite encrypted',
-             '/tmp/foo', ['-p', '/Users/mstenber/bin/insecurepassword']),
+             'sqlite', '/tmp/foo', ['-p', '/Users/mstenber/bin/insecurepassword']),
             ('SQLite',
-             '/tmp/foo', []),
+             'sqlite', '/tmp/foo', []),
+            ('Lmdb compressed+encrypted',
+             'lmdb', '/tmp/foo2', ['-b', 'lmdb', '-c', '-p', '/Users/mstenber/bin/insecurepassword']),
+            ('Lmdb encrypted',
+             'lmdb', '/tmp/foo2', ['-b', 'lmdb', '-p', '/Users/mstenber/bin/insecurepassword']),
+            ('Lmdb',
+             'lmdb', '/tmp/foo2', ['-b', 'lmdb']),
+
     ]:
         print(f'# {desc}')
         for write_cmd, units, unit_type in [
-                ('dd "if=/Users/mstenber/software/mac/10-11-elcapitan/Install OS X El Capitan.app/Contents/SharedSupport/InstallESD.dmg" of=/tmp/x/foo.dat bs=1024000', 5800, 'megabyte'),  # 1 file :p
+                ('dd "if=/Volumes/ulko/share/2/software/unix/2015-09-24-raspbian-jessie.img" of=/tmp/x/foo.dat bs=1024000',
+                 4325, 'megabyte'),  # 1 file :p
                 ('rsync -a /Users/mstenber/share/1/Maildir/.Junk /tmp/x/',
                  52122, 'file'),  # 942MB
         ]:
@@ -83,6 +91,8 @@ if __name__ == '__main__':
             if backend:
                 if os.path.isfile(backend):
                     os.unlink(backend)
+                elif os.path.isdir(backend):
+                    os.system('rm -rf %s' % backend)
             args = []
             if backend:
                 args.extend(['-f', backend])
@@ -113,4 +123,3 @@ if __name__ == '__main__':
                 print(f'Took {read_time} seconds')
                 print(f'{cnt} {unit_type}s per second')
                 print()
-

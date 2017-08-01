@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Tue Aug  1 17:58:39 2017 mstenber
-# Edit time:     196 min
+# Last modified: Tue Aug  1 18:34:30 2017 mstenber
+# Edit time:     198 min
 #
 """
 
@@ -27,6 +27,7 @@ import pytest
 
 import const
 import storage as st
+import storage_lmdb as stlm
 import storage_sqlite as stsql
 
 _debug = logging.getLogger(__name__).debug
@@ -172,7 +173,7 @@ def _prod_delayedstorage(s, be, flush=_nop):
     assert not s.flush()
 
     # ensure repeat set_block_name is nop
-    s.set_block_name(None, 'foo')
+    s.set_block_name(None, b'foo')
     assert not s.flush()
 
     assert not s.cache_size, s._blocks
@@ -278,18 +279,23 @@ def test_sqlitestorage_available_file():
 
 
 _backends = {'sqlite': stsql.SQLiteStorageBackend,
-             'dict': st.DictStorageBackend}
+             'dict': st.DictStorageBackend,
+             'lmdb': stlm.LMDBStorageBackend,
+             }
 
 
-@pytest.fixture(params=['sqlite', 'dict'])
+@pytest.fixture(params=list(_backends.keys()))
 def backend(request):
     return _backends[request.param]()
 
 
-_storages = {'sqlite': stsql.SQLiteStorage, 'dict': st.DictStorage}
+_storages = {'sqlite': stsql.SQLiteStorage,
+             'dict': st.DictStorage,
+             'lmdb': stlm.LMDBStorage,
+             }
 
 
-@pytest.fixture(params=['sqlite', 'dict'])
+@pytest.fixture(params=list(_storages.keys()))
 def storage(request):
     return _storages[request.param]()
 

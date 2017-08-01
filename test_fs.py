@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Dec 10 20:32:55 2016 mstenber
-# Last modified: Fri Dec 30 13:07:03 2016 mstenber
-# Edit time:     209 min
+# Last modified: Tue Aug  1 18:43:14 2017 mstenber
+# Edit time:     211 min
 #
 """Tests that use actual real (mocked) filesystem using the llfuse ops
 interface.
@@ -23,7 +23,7 @@ import errno
 import itertools
 import logging
 import os
-from ms.lazy import lazy_property
+
 import pytest
 
 import const
@@ -31,6 +31,8 @@ import forest
 import llfuse
 import ops
 import storage as st
+import storage_lmdb as stlm
+import storage_sqlite as stsql
 from test_ops import SetattrFieldsIsh
 from util import to_bytes, zeropad_bytes
 
@@ -326,6 +328,8 @@ def argument_parser():
     p.add_argument(
         '--filename', '-f',
         help='Filename to store the data in')
+    p.add_argument('--backend', '-b',
+                   help='backend to use')
     p.add_argument('--interval', '-i',
                    type=int, default=10, help='flush interval')
     p.add_argument('--mountpoint', '-m',
@@ -338,6 +342,7 @@ def argument_parser():
     p.add_argument('--workers', '-w',
                    default=1, type=int, help='number of threads to use')
     return p
+
 
 if __name__ == '__main__':
     import subprocess
@@ -357,7 +362,12 @@ if __name__ == '__main__':
             codec = st.CompressingTypedBlockCodec(codec)
         else:
             codec = st.TypedBlockCodec(codec)
-        backend = st.SQLiteStorageBackend(codec=codec, filename=args.filename)
+        if args.backend == 'lmdb':
+            backend = stlm.LMDBStorageBackend(
+                codec=codec, filename=args.filename)
+        else:
+            backend = stsql.SQLiteStorageBackend(
+                codec=codec, filename=args.filename)
         storage = st.DelayedStorage(backend=backend)
         storage.maximum_cache_size = args.cache_size
 
