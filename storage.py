@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:13:22 2016 mstenber
-# Last modified: Tue Aug  1 17:56:47 2017 mstenber
-# Edit time:     1020 min
+# Last modified: Tue Aug  1 18:37:22 2017 mstenber
+# Edit time:     1024 min
 #
 """This is the 'storage layer' main module.
 
@@ -26,7 +26,7 @@ import logging
 import os
 import time
 
-import lz4
+import lz4.block
 import psutil
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
@@ -159,7 +159,7 @@ class CompressingTypedBlockCodec(TypedBlockCodec):
     def encode_block(self, block_id, block_data):
         (t, d) = block_data
         assert not (t & const.BIT_COMPRESSED)
-        cd = lz4.compress(d)
+        cd = lz4.block.compress(d)
         if len(cd) < len(d):
             t = t | const.BIT_COMPRESSED
             d = cd
@@ -168,7 +168,7 @@ class CompressingTypedBlockCodec(TypedBlockCodec):
     def decode_block(self, block_id, block_data):
         (t, d) = TypedBlockCodec.decode_block(self, block_id, block_data)
         if t & const.BIT_COMPRESSED:
-            d = lz4.loads(d)
+            d = lz4.block.decompress(d)
             t = t & ~const.BIT_COMPRESSED
         return (t, d)
 
