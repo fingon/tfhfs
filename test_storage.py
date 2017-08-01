@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Wed Jun 29 10:36:03 2016 mstenber
-# Last modified: Sat Feb  4 22:45:52 2017 mstenber
-# Edit time:     195 min
+# Last modified: Tue Aug  1 17:58:39 2017 mstenber
+# Edit time:     196 min
 #
 """
 
@@ -27,6 +27,7 @@ import pytest
 
 import const
 import storage as st
+import storage_sqlite as stsql
 
 _debug = logging.getLogger(__name__).debug
 
@@ -265,25 +266,27 @@ def test_storage_wrapped(storage):
     dict(ignore_errors=True),
 ])
 def test_sqlitestorage_get_execute_error(kwargs):
-    s = st.SQLiteStorageBackend()
+    s = stsql.SQLiteStorageBackend()
     s._get_execute_result('BLORB', **kwargs)
 
 
 def test_sqlitestorage_available_file():
     with tempfile.TemporaryDirectory() as td:
         path = os.path.join(td, 'x.db')
-        s = st.SQLiteStorageBackend(filename=path)
+        s = stsql.SQLiteStorageBackend(filename=path)
         assert s.get_bytes_available()
 
 
-_backends = {'sqlite': st.SQLiteStorageBackend, 'dict': st.DictStorageBackend}
+_backends = {'sqlite': stsql.SQLiteStorageBackend,
+             'dict': st.DictStorageBackend}
 
 
 @pytest.fixture(params=['sqlite', 'dict'])
 def backend(request):
     return _backends[request.param]()
 
-_storages = {'sqlite': st.SQLiteStorage, 'dict': st.DictStorage}
+
+_storages = {'sqlite': stsql.SQLiteStorage, 'dict': st.DictStorage}
 
 
 @pytest.fixture(params=['sqlite', 'dict'])

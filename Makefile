@@ -6,8 +6,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sat Nov 19 10:48:22 2016 mstenber
-# Last modified: Fri Dec 30 15:50:35 2016 mstenber
-# Edit time:     46 min
+# Last modified: Tue Aug  1 18:01:27 2017 mstenber
+# Edit time:     48 min
 #
 #
 
@@ -27,7 +27,12 @@ endif
 # (I CBA with venv for this for now)
 PIP_TO_USER=--user
 
-all: test autopep8
+all: test
+
+# autopep8
+# ^ no longer really relevant due to my Emacs default config
+# autopep8/isorting all Python code I touch..
+
 
 clean:
 	rm -f .done.*
