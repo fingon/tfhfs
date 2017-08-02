@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sun Dec 25 08:04:44 2016 mstenber
-# Last modified: Tue Aug  1 18:48:25 2017 mstenber
-# Edit time:     62 min
+# Last modified: Wed Aug  2 09:43:34 2017 mstenber
+# Edit time:     66 min
 #
 """
 
@@ -19,6 +19,7 @@ the 'official' performance figures with.
 
 """
 
+import argparse
 import os
 import os.path
 import subprocess
@@ -62,22 +63,31 @@ if __name__ == '__main__':
     import time
 
     read_cmd = 'find /tmp/x -type f | xargs cat > /dev/null'
-    for desc, backend_type, backend, backend_options in [
-            ('In-memory dict', None, '', []),
-            ('SQLite compressed+encrypted',
-             'sqlite', '/tmp/foo', ['-c', '-p', '/Users/mstenber/bin/insecurepassword']),
-            ('SQLite encrypted',
-             'sqlite', '/tmp/foo', ['-p', '/Users/mstenber/bin/insecurepassword']),
-            ('SQLite',
-             'sqlite', '/tmp/foo', []),
-            ('Lmdb compressed+encrypted',
-             'lmdb', '/tmp/foo2', ['-b', 'lmdb', '-c', '-p', '/Users/mstenber/bin/insecurepassword']),
-            ('Lmdb encrypted',
-             'lmdb', '/tmp/foo2', ['-b', 'lmdb', '-p', '/Users/mstenber/bin/insecurepassword']),
-            ('Lmdb',
-             'lmdb', '/tmp/foo2', ['-b', 'lmdb']),
+    tests = [
+        ('In-memory dict', None, '', []),
+        ('SQLite compressed+encrypted',
+         'sqlite', '/tmp/foo', ['-c', '-p', '/Users/mstenber/bin/insecurepassword']),
+        ('SQLite encrypted',
+         'sqlite', '/tmp/foo', ['-p', '/Users/mstenber/bin/insecurepassword']),
+        ('SQLite',
+         'sqlite', '/tmp/foo', []),
+        ('Lmdb compressed+encrypted',
+         'lmdb', '/tmp/foo2', ['-b', 'lmdb', '-c', '-p', '/Users/mstenber/bin/insecurepassword']),
+        ('Lmdb encrypted',
+         'lmdb', '/tmp/foo2', ['-b', 'lmdb', '-p', '/Users/mstenber/bin/insecurepassword']),
+        ('Lmdb',
+         'lmdb', '/tmp/foo2', ['-b', 'lmdb']),
 
-    ]:
+    ]
+
+    p = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    p.add_argument('--test', '-t', type=int, default=-1,
+                   help='Run single test (-1 = all)')
+    args = p.parse_args()
+    if args.test >= 0:
+        tests = [tests[args.test]]
+    for desc, backend_type, backend, backend_options in tests:
         print(f'# {desc}')
         for write_cmd, units, unit_type in [
                 ('dd "if=/Volumes/ulko/share/2/software/unix/2015-09-24-raspbian-jessie.img" of=/tmp/x/foo.dat bs=1024000',
