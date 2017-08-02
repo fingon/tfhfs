@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sun Dec 25 08:04:44 2016 mstenber
-# Last modified: Wed Aug  2 09:43:34 2017 mstenber
-# Edit time:     66 min
+# Last modified: Wed Aug  2 11:49:36 2017 mstenber
+# Edit time:     71 min
 #
 """
 
@@ -63,22 +63,27 @@ if __name__ == '__main__':
     import time
 
     read_cmd = 'find /tmp/x -type f | xargs cat > /dev/null'
-    tests = [
-        ('In-memory dict', None, '', []),
-        ('SQLite compressed+encrypted',
-         'sqlite', '/tmp/foo', ['-c', '-p', '/Users/mstenber/bin/insecurepassword']),
-        ('SQLite encrypted',
-         'sqlite', '/tmp/foo', ['-p', '/Users/mstenber/bin/insecurepassword']),
-        ('SQLite',
-         'sqlite', '/tmp/foo', []),
-        ('Lmdb compressed+encrypted',
-         'lmdb', '/tmp/foo2', ['-b', 'lmdb', '-c', '-p', '/Users/mstenber/bin/insecurepassword']),
-        ('Lmdb encrypted',
-         'lmdb', '/tmp/foo2', ['-b', 'lmdb', '-p', '/Users/mstenber/bin/insecurepassword']),
-        ('Lmdb',
-         'lmdb', '/tmp/foo2', ['-b', 'lmdb']),
-
-    ]
+    tests = []
+    # tests.append(('In-memory dict', None, '', [])), # n/a really
+    if True:
+        tests.extend([
+            ('SQLite compressed+encrypted',
+             'sqlite', '/tmp/foo', ['-c', '-p', '/Users/mstenber/bin/insecurepassword']),
+            ('SQLite encrypted',
+             'sqlite', '/tmp/foo', ['-p', '/Users/mstenber/bin/insecurepassword']),
+            ('SQLite',
+             'sqlite', '/tmp/foo', [])
+        ])
+    if False:
+        # inexplicably lmdb is actually slower than sqlite!
+        tests.extend([
+            ('Lmdb compressed+encrypted',
+             'lmdb', '/tmp/foo2', ['-b', 'lmdb', '-c', '-p', '/Users/mstenber/bin/insecurepassword']),
+            ('Lmdb encrypted',
+             'lmdb', '/tmp/foo2', ['-b', 'lmdb', '-p', '/Users/mstenber/bin/insecurepassword']),
+            ('Lmdb',
+             'lmdb', '/tmp/foo2', ['-b', 'lmdb']),
+        ])
 
     p = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -93,7 +98,7 @@ if __name__ == '__main__':
                 ('dd "if=/Volumes/ulko/share/2/software/unix/2015-09-24-raspbian-jessie.img" of=/tmp/x/foo.dat bs=1024000',
                  4325, 'megabyte'),  # 1 file :p
                 ('rsync -a /Users/mstenber/share/1/Maildir/.Junk /tmp/x/',
-                 52122, 'file'),  # 942MB
+                 56711, 'file'),  # 1082MB
         ]:
             print(f'## Write {units} {unit_type}s')
 
