@@ -9,8 +9,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Tue Aug  1 18:04:55 2017 mstenber
-# Last modified: Tue Aug  1 18:33:31 2017 mstenber
-# Edit time:     22 min
+# Last modified: Wed Aug  2 10:00:04 2017 mstenber
+# Edit time:     33 min
 #
 """
 
@@ -66,7 +66,11 @@ class LMDBStorageBackend(storage.StorageBackend):
             t.delete(block.id)
 
     def flush_block(self, block):
-        data = cbor.dumps((block.data, block.refcnt, block.type))
+        block_data = b''
+        if block.data is not None:
+            block_data = self.codec.encode_block(block.id, block.data)
+        assert isinstance(block_data, bytes)
+        data = cbor.dumps([block_data, block.refcnt, block.type])
         with self.env.begin(db=self.block_db, write=True) as t:
             if t.get(block.id) == data:
                 return 0
@@ -78,12 +82,17 @@ class LMDBStorageBackend(storage.StorageBackend):
 
     def get_block_by_id(self, st, block_id):
         _debug('get_block_by_id %s', block_id)
+        if not block_id:
+            return
         with self.env.begin(db=self.block_db) as t:
             r = t.get(block_id)
             if not r:
                 return
             r = cbor.loads(r)
         block_data, block_refcnt, block_type = r
+        assert isinstance(block_data, bytes)
+        assert isinstance(block_refcnt, int)
+        block_data = block_data or None
         block_data = self.codec.decode_block(block_id, block_data)
         b = storage.StoredBlock(st, block_id, refcnt=block_refcnt, data=block_data,
                                 type=block_type)
