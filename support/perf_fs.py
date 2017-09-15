@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sun Dec 25 08:04:44 2016 mstenber
-# Last modified: Wed Aug  2 11:49:36 2017 mstenber
-# Edit time:     71 min
+# Last modified: Fri Sep 15 11:01:55 2017 mstenber
+# Edit time:     72 min
 #
 """
 
@@ -23,13 +23,14 @@ import argparse
 import os
 import os.path
 import subprocess
+import sys
 
 _support_dir = os.path.dirname(__file__)
 _test_fs = os.path.join(_support_dir, '..', 'test_fs.py')
 
 
 def open_fs(args):
-    return (subprocess.Popen([_test_fs] + list(args), stdout=2),
+    return (subprocess.Popen([sys.executable, _test_fs] + list(args), stdout=2),
             args)
 
 
