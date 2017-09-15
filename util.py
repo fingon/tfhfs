@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Fri Nov 25 15:06:01 2016 mstenber
-# Last modified: Fri Jan 13 12:38:25 2017 mstenber
-# Edit time:     63 min
+# Last modified: Fri Sep 15 11:03:32 2017 mstenber
+# Edit time:     77 min
 #
 """
 
@@ -254,13 +254,26 @@ class CBORPickler:
                     pass
 
 
+def getsizeof(o):
+    if isinstance(o, collections.Iterable):
+        return 8 + len(o)
+    return 8  # wild guess, probably wrong
+
+
+try:
+    sys.getsizeof(42)
+    getsizeof = sys.getsizeof
+except TypeError:
+    pass  # pypy3 variant, fallback
+
+
 def getrecsizeof(o, seen=None):
     if seen is None:
         seen = set()
     if id(o) in seen:
         return 0
     seen.add(id(o))
-    c = sys.getsizeof(o)
+    c = getsizeof(o)
     if isinstance(o, dict):
         for k, v in o.items():
             c += getrecsizeof(k, seen)
